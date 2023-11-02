@@ -1,11 +1,11 @@
-package main
+package client
 
 import (
 	"net"
 	"os"
 )
 
-func main() {
+func Run() {
 	socket, err := net.ListenPacket("udp", "")
 
 	if err != nil {
@@ -14,7 +14,7 @@ func main() {
 
 	defer socket.Close()
 
-	address, err := net.ResolveUDPAddr("udp", os.Args[1])
+	address, err := net.ResolveUDPAddr("udp", os.Args[2])
 
 	if err != nil {
 		panic(err.Error())

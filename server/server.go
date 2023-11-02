@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -6,9 +6,9 @@ import (
 	"os"
 )
 
-func main() {
+func Run() {
 	
-	socket, err := net.ListenPacket("udp", os.Args[1])
+	socket, err := net.ListenPacket("udp", os.Args[2])
 
 	if err != nil {
 		panic(err.Error())
@@ -16,7 +16,7 @@ func main() {
 
 	defer socket.Close()
 
-	fmt.Printf("Listening on %s\n\n", os.Args[1])
+	fmt.Printf("Listening on %s\n\n", os.Args[2])
 	buffer := make([]byte, 1024)
 
 	_, sender, err := socket.ReadFrom(buffer)
