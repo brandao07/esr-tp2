@@ -8,7 +8,7 @@ import (
 	"github.com/brandao07/esr-tp2/src/util"
 )
 
-func runClient() {
+func RunClient() {
 	socket, err := net.ListenPacket("udp", os.Args[2])
 	util.HandleError(err)
 

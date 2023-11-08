@@ -84,7 +84,7 @@ func service3(wg *sync.WaitGroup, db *Database) {
 	}
 }
 
-func runServer() {
+func RunServer() {
 	var wg sync.WaitGroup
 	db := Database{
 		Data: make(map[string]int),

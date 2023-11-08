@@ -1,6 +1,7 @@
-package test
+package example
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -14,7 +15,7 @@ type Scenario1Config struct {
 	RPAddress     string
 }
 
-type Database struct {
+type Scenario1Database struct {
 	Data map[string]string
 	lock sync.RWMutex
 }
@@ -62,7 +63,7 @@ func c2(config Scenario1Config, wg *sync.WaitGroup) {
 	fmt.Printf("CLIENT2: Received response from %s: %s\n", server.String(), string(buffer))
 }
 
-func rpHandler(socket net.PacketConn, sender net.Addr, request, serverAddress string, db *Database) {
+func rpHandler(socket net.PacketConn, sender net.Addr, request, serverAddress string, db *Scenario1Database) {
 	fmt.Printf("RP: Received request from %s: %s\n", sender.String(), request)
 
 	if _, ok := db.Data[request]; ok {
@@ -95,7 +96,7 @@ func rpHandler(socket net.PacketConn, sender net.Addr, request, serverAddress st
 }
 
 func rp(config Scenario1Config, wg *sync.WaitGroup) {
-	db := Database{
+	db := Scenario1Database{
 		Data: make(map[string]string),
 	}
 	socket, err := net.ListenPacket("udp", config.RPAddress)
@@ -114,12 +115,21 @@ func rp(config Scenario1Config, wg *sync.WaitGroup) {
 	}
 }
 
-func serverHandler(socket net.PacketConn, sender net.Addr, request, serverAddress string, db *Database) {
+func serverHandler(socket net.PacketConn, sender net.Addr, request, serverAddress string, db *Scenario1Database) {
+	fmt.Printf("SERVER: Received request from %s: %s\n", sender.String(), request)
 
+	if _, ok := db.Data[request]; ok {
+		// Server returns the value directly
+		value := db.Data[request]
+		_, err := socket.WriteTo([]byte(value), sender)
+		util.HandleError(err)
+	} else {
+		util.HandleError(errors.New("key not found"))
+	}
 }
 
 func server(config Scenario1Config, wg *sync.WaitGroup) {
-	db := Database{
+	db := Scenario1Database{
 		Data: make(map[string]string),
 	}
 	db.lock.Lock()
