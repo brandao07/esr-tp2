@@ -4,6 +4,7 @@ BUILD_FLAGS = -o ./cmd/$(BINARY_NAME)
 
 # Build the executable
 build:
+	@go fmt ./...
 	@echo "Building $(BINARY_NAME)..."
 	@go build $(BUILD_FLAGS) ./src
 
@@ -17,6 +18,7 @@ clean:
 	@echo "Cleaning up..."
 	@rm -f ./cmd/$(BINARY_NAME)
 	@rm -d ./cmd
+	@rm -f out.mjpeg
 
 # Build and run the application
 all: build run
