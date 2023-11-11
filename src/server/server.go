@@ -6,12 +6,9 @@ import (
 	"os"
 	"sync"
 
+	"github.com/brandao07/esr-tp2/src/entity"
 	"github.com/brandao07/esr-tp2/src/util"
 )
-
-type Database struct {
-	Data map[string]string
-}
 
 func setupServer(serverAddress string) net.PacketConn {
 	socket, err := net.ListenPacket("udp", serverAddress)
@@ -29,22 +26,32 @@ func readFromSocket(socket net.PacketConn, buffer []byte) (int, net.Addr) {
 	return n, sender
 }
 
-func processRequest(socket net.PacketConn, sender net.Addr, request string, videoData []byte) {
-	fmt.Printf("SERVER: Received request from %s: %s\n", sender.String(), request)
+// TODO: Implement packet loss detection logic
+func isPacketLossDetected(socket net.PacketConn) bool {
+	fmt.Println("Verifying for potential packet loss")
+	return false
+}
+
+func processRequest(socket net.PacketConn, addr net.Addr, request string, videoData []byte) {
+	fmt.Printf("Received request from %s: %s\n", addr.String(), request)
 
 	chunks := util.SplitIntoChunks(videoData, 1024)
+	for i, chunk := range chunks {
+		// Send packet
+		util.SendPacket(socket, addr, i, chunk, entity.STREAMING)
 
-	for _, chunk := range chunks {
-		_, err := socket.WriteTo(chunk, sender)
-		util.HandleError(err)
+		// Check for packet loss and retransmit if necessary
+		if isPacketLossDetected(socket) {
+			fmt.Printf("Packet loss detected for sequence number: %d\n", i)
+			util.SendPacket(socket, addr, i, chunk, entity.STREAMING)
+		}
 	}
 
 	// Send end of stream signal
-	_, err := socket.WriteTo([]byte("END_OF_STREAM"), sender)
-	util.HandleError(err)
+	util.SendPacket(socket, addr, 0, nil, entity.FINISHED)
 }
 
-func handleUDPRequest(wg *sync.WaitGroup, serverAddress string, db *Database) {
+func handleUDPRequest(wg *sync.WaitGroup, serverAddress string) {
 	socket := setupServer(serverAddress)
 	buffer := make([]byte, 1024)
 
@@ -65,14 +72,8 @@ func handleUDPRequest(wg *sync.WaitGroup, serverAddress string, db *Database) {
 func Run(serverAddress string) {
 	var wg sync.WaitGroup
 
-	db := Database{
-		Data: make(map[string]string),
-	}
-
-	db.Data["David"] = "Muse"
-	db.Data["Andre"] = "Bladee"
-
 	wg.Add(1)
-	go handleUDPRequest(&wg, serverAddress, &db)
+	go handleUDPRequest(&wg, serverAddress)
+	//go handlePackageRequest(&wg, serverAddress)
 	wg.Wait()
 }

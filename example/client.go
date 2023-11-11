@@ -9,7 +9,7 @@ import (
 )
 
 func RunClient() {
-	socket, err := net.ListenPacket("udp", os.Args[2])
+	socket, err := net.ListenPacket("udp", "")
 	util.HandleError(err)
 
 	defer socket.Close()

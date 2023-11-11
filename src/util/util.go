@@ -1,7 +1,11 @@
 package util
 
 import (
+	"bytes"
+	"encoding/binary"
 	"log"
+
+	"github.com/brandao07/esr-tp2/src/entity"
 )
 
 func HandleError(err error) {
@@ -24,4 +28,11 @@ func SplitIntoChunks(data []byte, chunkSize int) [][]byte {
 	}
 
 	return chunks
+}
+
+func GetPacketId(pac *entity.Packet) (uint64, error) {
+	var id uint64
+	readBuf := bytes.NewReader(pac.Id)
+	err := binary.Read(readBuf, binary.LittleEndian, &id)
+	return id, err
 }
