@@ -29,26 +29,10 @@ func readFromSocket(socket net.PacketConn, buffer []byte) (int, net.Addr) {
 	return n, sender
 }
 
-func splitIntoChunks(data []byte, chunkSize int) [][]byte {
-	var chunks [][]byte
-
-	for i := 0; i < len(data); i += chunkSize {
-		end := i + chunkSize
-
-		if end > len(data) {
-			end = len(data)
-		}
-
-		chunks = append(chunks, data[i:end])
-	}
-
-	return chunks
-}
-
 func processRequest(socket net.PacketConn, sender net.Addr, request string, videoData []byte) {
 	fmt.Printf("SERVER: Received request from %s: %s\n", sender.String(), request)
 
-	chunks := splitIntoChunks(videoData, 1024)
+	chunks := util.SplitIntoChunks(videoData, 1024)
 
 	for _, chunk := range chunks {
 		_, err := socket.WriteTo(chunk, sender)
@@ -80,6 +64,7 @@ func handleUDPRequest(wg *sync.WaitGroup, serverAddress string, db *Database) {
 
 func Run(serverAddress string) {
 	var wg sync.WaitGroup
+
 	db := Database{
 		Data: make(map[string]string),
 	}

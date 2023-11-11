@@ -15,11 +15,11 @@ func setupClient() net.PacketConn {
 	return socket
 }
 
-func sendRequest(socket net.PacketConn, serverAddress, message string) {
+func sendRequest(socket net.PacketConn, serverAddress, request string) {
 	address, err := net.ResolveUDPAddr("udp", serverAddress)
 	util.HandleError(err)
 
-	_, err = socket.WriteTo([]byte(message), address)
+	_, err = socket.WriteTo([]byte(request), address)
 	util.HandleError(err)
 }
 
@@ -27,7 +27,7 @@ func readResponse(socket net.PacketConn, videoFile *os.File) {
 	buffer := make([]byte, 1024)
 
 	for {
-		n, server, err := socket.ReadFrom(buffer)
+		n, response, err := socket.ReadFrom(buffer)
 		util.HandleError(err)
 
 		// Check for end of stream signal
@@ -40,7 +40,7 @@ func readResponse(socket net.PacketConn, videoFile *os.File) {
 		_, err = videoFile.Write(buffer[:n])
 		util.HandleError(err)
 
-		fmt.Printf("Received %d bytes from %s\n", n, server.String())
+		fmt.Printf("Received %d bytes from %s\n", n, response.String())
 	}
 }
 
