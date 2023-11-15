@@ -10,13 +10,14 @@ const (
 )
 
 type Database struct {
-	Data map[string]string
+	Videos map[string][]byte
 }
 
 type Packet struct {
 	Id    []byte
 	Data  []byte
 	State []byte
+	//Timestamp time.Time //TODO: Add Timestamp to Packet
 }
 
 type Node struct {

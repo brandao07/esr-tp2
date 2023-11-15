@@ -20,7 +20,7 @@ func main() {
 	validateArgs(2, "insufficient number of arguments")
 	switch t := os.Args[1]; t {
 	case "Bootstrap":
-		server.RunBootstrap()
+		server.RunBootstrap("bootstrapper.json")
 	case "Server":
 		validateArgs(3, "insufficient number of arguments for Server mode")
 		server.Run(os.Args[2])
