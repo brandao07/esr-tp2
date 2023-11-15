@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"net"
-	"time"
 
 	"github.com/brandao07/esr-tp2/src/entity"
 )
@@ -13,9 +12,9 @@ import (
 func ReceivePacket(socket net.PacketConn) (*entity.Packet, net.Addr) {
 	// Read packet
 	readBuff := make([]byte, 2024)
-	socket.SetReadDeadline(time.Now().Add(2 * time.Second))
+	//socket.SetReadDeadline(time.Now().Add(2 * time.Second))
 	//FIXME: ReadFrom is not working properly when trying to read ACK or REQ packets (server side)
-	_, addr, err := socket.ReadFrom(readBuff) 
+	_, addr, err := socket.ReadFrom(readBuff)
 	HandleError(err)
 
 	// Decode packet
@@ -36,7 +35,7 @@ func SendPacket(socket net.PacketConn, addr net.Addr, id int, data []byte, state
 	pac := entity.Packet{
 		Id:    idBuff.Bytes(),
 		Data:  data,
-		State: []byte(state), 
+		State: []byte(state),
 	}
 
 	// Encode packet

@@ -52,8 +52,8 @@ func processRequest(socket net.PacketConn, addr net.Addr, request string, videoD
 	util.SendPacket(socket, addr, 0, nil, entity.FINISHED)
 }
 
-func handleUDPRequest(wg *sync.WaitGroup, serverAddress string) {
-	socket := setupServer(serverAddress)
+func handleUDPRequest(wg *sync.WaitGroup, node *entity.Node) {
+	socket := setupServer(node.FullAddress)
 	buffer := make([]byte, 1024)
 
 	defer socket.Close()
@@ -70,30 +70,77 @@ func handleUDPRequest(wg *sync.WaitGroup, serverAddress string) {
 	}
 }
 
-func handleBootstrapRequest(wg *sync.WaitGroup, serverAddress string, isBootstrap bool) {
+func readBootstrapFile(filepath string) []entity.Node {
+	jsonData, err := os.ReadFile(filepath)
+	util.HandleError(err)
+
+	var nodes []entity.Node
+	err = json.Unmarshal(jsonData, &nodes)
+	util.HandleError(err)
+
+	return nodes
+}
+
+func getNode(bootstrapAddress, aux string) *entity.Node {
+	socket, err := net.ListenPacket("udp", "") // FIXME: Use a random port
+	util.HandleError(err)
+
+	defer socket.Close()
+
+	address, err := net.ResolveUDPAddr("udp", bootstrapAddress)
+	util.HandleError(err)
+
+	_, err = socket.WriteTo([]byte("GET_NODE"), address)
+	util.HandleError(err)
+
+	node := util.ReceiveNode(socket)
+
+	return node
+}
+
+func processNode(socket net.PacketConn, nodes []entity.Node, address net.Addr) {
+	for _, node := range nodes {
+		if node.FullAddress == address.String() {
+			util.SendNode(socket, address, node)
+			fmt.Println("Sent node to", address.String())
+			return
+		}
+	}
+}
+
+func handleBootstrapRequest(wg *sync.WaitGroup, isBootstrap bool) {
 	defer (*wg).Done()
 
 	if !isBootstrap {
 		return
 	}
+	nodes := readBootstrapFile("bootstrapper.json")
 
-	// Read JSON file
-	jsonData, err := os.ReadFile("src/server/bootstrap.json")
-	util.HandleError(err)
-	
-	var data map[string][]entity.Node
-	err = json.Unmarshal(jsonData, &data)
-	util.HandleError(err)
-	fmt.Println(data)
+	serverAddress := nodes[0].Address + ":" + nodes[0].BootstrapPort
+	socket := setupServer(serverAddress)
+	defer socket.Close()
 
+	buffer := make([]byte, 2024)
+
+	for {
+		_, address := readFromSocket(socket, buffer)
+		wg.Add(1)
+		go processNode(socket, nodes, address)
+	}
 }
 
-
-func Run(serverAddress string, isBootstrap bool) {
+func Run(bootstrapAddress, aux string) {
 	var wg sync.WaitGroup
 
-	wg.Add(2)
-	go handleUDPRequest(&wg, serverAddress)
-	go handleBootstrapRequest(&wg, serverAddress, isBootstrap)
+	node := getNode(bootstrapAddress, aux)
+	wg.Add(1)
+	go handleUDPRequest(&wg, node)
+	wg.Wait()
+}
+
+func RunBootstrap() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go handleBootstrapRequest(&wg, true)
 	wg.Wait()
 }

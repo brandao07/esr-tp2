@@ -17,12 +17,13 @@ func validateArgs(minArgs int, errMsg string) {
 }
 
 func main() {
-	validateArgs(3, "insufficient number of arguments")
+	validateArgs(2, "insufficient number of arguments")
 	switch t := os.Args[1]; t {
 	case "Bootstrap":
-		server.Run(os.Args[2], true)
+		server.RunBootstrap()
 	case "Server":
-		server.Run(os.Args[2], false)
+		validateArgs(3, "insufficient number of arguments for Server mode")
+		server.Run(os.Args[2], os.Args[3])
 	case "Client":
 		validateArgs(4, "insufficient number of arguments for Client mode")
 		client.Run(os.Args[2], os.Args[3])

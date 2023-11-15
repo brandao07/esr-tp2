@@ -22,5 +22,7 @@ func TestNodeUnmarshal(t *testing.T) {
 		t.Errorf("Error unmarshaling JSON: %v", err)
 		return
 	}
-	t.Log(nodes[0].Address)
+
+	serverAddress := nodes[0].Address + ":" + nodes[0].BootstrapPort
+	t.Log(serverAddress)
 }

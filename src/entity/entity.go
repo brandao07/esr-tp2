@@ -20,9 +20,10 @@ type Packet struct {
 }
 
 type Node struct {
-	ID         int    `json:"id"`
-	Label      string `json:"label"`
-	Address    string `json:"address"`
-	Type       string `json:"type"`
-	Neighbours []Node `json:"neighbours"`
+	Address       string `json:"address"`
+	Port          string `json:"port"`
+	FullAddress   string `json:"fullAddress"`
+	Type          string `json:"type"`
+	BootstrapPort string `json:"bootstrapPort"`
+	Neighbours    []Node `json:"neighbours"`
 }
