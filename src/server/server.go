@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -69,11 +70,30 @@ func handleUDPRequest(wg *sync.WaitGroup, serverAddress string) {
 	}
 }
 
-func Run(serverAddress string) {
+func handleBootstrapRequest(wg *sync.WaitGroup, serverAddress string, isBootstrap bool) {
+	defer (*wg).Done()
+
+	if !isBootstrap {
+		return
+	}
+
+	// Read JSON file
+	jsonData, err := os.ReadFile("src/server/bootstrap.json")
+	util.HandleError(err)
+	
+	var data map[string][]entity.Node
+	err = json.Unmarshal(jsonData, &data)
+	util.HandleError(err)
+	fmt.Println(data)
+
+}
+
+
+func Run(serverAddress string, isBootstrap bool) {
 	var wg sync.WaitGroup
 
-	wg.Add(1)
+	wg.Add(2)
 	go handleUDPRequest(&wg, serverAddress)
-	//go handlePackageRequest(&wg, serverAddress)
+	go handleBootstrapRequest(&wg, serverAddress, isBootstrap)
 	wg.Wait()
 }

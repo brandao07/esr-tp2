@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "label": "Node 1",
+    "address": "127.0.0.1:3000",
+    "type": "A",
+    "neighbours": [
+      {
+        "id": 2,
+        "label": "Node 2",
+        "address": "127.0.0.1:3001",
+        "type": "B"
+      },
+      { "id": 3, "label": "Node 3", "address": "127.0.0.1:3002", "type": "C" }
+    ]
+  },
+  {
+    "id": 2,
+    "label": "Node 2",
+    "address": "127.0.0.1:3001",
+    "type": "B",
+    "neighbours": [
+      {
+        "id": 1,
+        "label": "Node 1",
+        "address": "127.0.0.1:3000",
+        "type": "A"
+      },
+      { "id": 3, "label": "Node 3", "address": "127.0.0.1:3002", "type": "C" }
+    ]
+  },
+  {
+    "id": 3,
+    "label": "Node 3",
+    "address": "127.0.0.1:3002",
+    "type": "C",
+    "neighbours": [
+      {
+        "id": 1,
+        "label": "Node 1",
+        "address": "127.0.0.1:3000",
+        "type": "A"
+      },
+      { "id": 2, "label": "Node 2", "address": "127.0.0.1:3001", "type": "B" }
+    ]
+  }
+]

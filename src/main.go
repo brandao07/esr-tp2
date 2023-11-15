@@ -9,13 +9,24 @@ import (
 	"github.com/brandao07/esr-tp2/src/util"
 )
 
+func validateArgs(minArgs int, errMsg string) {
+	if len(os.Args) < minArgs {
+		util.HandleError(errors.New(errMsg))
+		os.Exit(1)
+	}
+}
+
 func main() {
+	validateArgs(3, "insufficient number of arguments")
 	switch t := os.Args[1]; t {
+	case "Bootstrap":
+		server.Run(os.Args[2], true)
 	case "Server":
-		server.Run(os.Args[2])
+		server.Run(os.Args[2], false)
 	case "Client":
+		validateArgs(4, "insufficient number of arguments for Client mode")
 		client.Run(os.Args[2], os.Args[3])
 	default:
-		util.HandleError(errors.New("invalid argument for type! (Server, Client)"))
+		util.HandleError(errors.New("invalid argument for type! (Bootstrap, Server, Client)"))
 	}
 }

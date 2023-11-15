@@ -18,3 +18,11 @@ type Packet struct {
 	Data  []byte
 	State []byte
 }
+
+type Node struct {
+	ID         int    `json:"id"`
+	Label      string `json:"label"`
+	Address    string `json:"address"`
+	Type       string `json:"type"`
+	Neighbours []Node `json:"neighbours"`
+}
