@@ -40,7 +40,6 @@ func processNode(socket net.PacketConn, nodes []entity.Node, fullAddr net.Addr) 
 }
 
 func handleBootstrapRequest(serverAddress string, nodes []entity.Node, readySignal chan<- struct{}) {
-
 	socket := setupServer(serverAddress)
 	defer socket.Close()
 
