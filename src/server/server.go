@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/brandao07/esr-tp2/src/entity"
@@ -100,9 +101,10 @@ func getNode(bootstrapAddress, aux string) *entity.Node {
 
 func processNode(socket net.PacketConn, nodes []entity.Node, address net.Addr) {
 	for _, node := range nodes {
-		if node.FullAddress == address.String() {
+		addr := strings.Split(address.String(), ":")[0]
+		if node.Address == addr {
 			util.SendNode(socket, address, node)
-			fmt.Println("Sent node to", address.String())
+			fmt.Println("Sent node to", node.FullAddress)
 			return
 		}
 	}
@@ -124,15 +126,14 @@ func handleBootstrapRequest(wg *sync.WaitGroup, isBootstrap bool) {
 
 	for {
 		_, address := readFromSocket(socket, buffer)
-		wg.Add(1)
 		go processNode(socket, nodes, address)
 	}
 }
 
-func Run(bootstrapAddress, aux string) {
+func Run(bootstrapAddress string) {
 	var wg sync.WaitGroup
 
-	node := getNode(bootstrapAddress, aux)
+	node := getNode(bootstrapAddress, "")
 	wg.Add(1)
 	go handleUDPRequest(&wg, node)
 	wg.Wait()

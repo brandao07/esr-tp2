@@ -23,7 +23,7 @@ func main() {
 		server.RunBootstrap()
 	case "Server":
 		validateArgs(3, "insufficient number of arguments for Server mode")
-		server.Run(os.Args[2], os.Args[3])
+		server.Run(os.Args[2])
 	case "Client":
 		validateArgs(4, "insufficient number of arguments for Client mode")
 		client.Run(os.Args[2], os.Args[3])
