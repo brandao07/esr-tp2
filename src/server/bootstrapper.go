@@ -27,7 +27,7 @@ func readNodesFromFile(filepath string) []entity.Node {
 func processNode(socket net.PacketConn, nodes []entity.Node, fullAddr net.Addr) {
 	// Extract the IP address from the fullAddr net.Addr
 	addr := strings.Split(fullAddr.String(), ":")[0]
-
+	fmt.Println(fullAddr)
 	for _, node := range nodes {
 		if node.Address == addr {
 			// Send the node information using the provided socket to the address represented by fullAddr
@@ -39,8 +39,8 @@ func processNode(socket net.PacketConn, nodes []entity.Node, fullAddr net.Addr) 
 	}
 }
 
-func handleBootstrapRequest(nodes []entity.Node, readySignal chan<- struct{}) {
-	serverAddress := nodes[0].Address + ":" + nodes[0].BootstrapPort
+func handleBootstrapRequest(serverAddress string, nodes []entity.Node, readySignal chan<- struct{}) {
+
 	socket := setupServer(serverAddress)
 	defer socket.Close()
 
@@ -49,17 +49,20 @@ func handleBootstrapRequest(nodes []entity.Node, readySignal chan<- struct{}) {
 	close(readySignal)
 
 	for {
+
 		_, address := readFromSocket(socket, buffer)
+
 		go processNode(socket, nodes, address)
 	}
 }
 
 func RunBootstrap(filePath string) {
 	nodes := readNodesFromFile(filePath)
+	serverAddress := nodes[0].Address + ":" + nodes[0].BootstrapPort
 	bootstrapReady := make(chan struct{})
-	go handleBootstrapRequest(nodes, bootstrapReady)
+	go handleBootstrapRequest(serverAddress, nodes, bootstrapReady)
 
 	// Wait for the bootstrap server to be ready
 	<-bootstrapReady
-	Run(nodes[0].FullAddress)
+	Run(serverAddress)
 }
