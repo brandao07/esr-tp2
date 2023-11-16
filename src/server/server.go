@@ -2,9 +2,11 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/brandao07/esr-tp2/src/entity"
 	"github.com/brandao07/esr-tp2/src/util"
@@ -14,7 +16,7 @@ func setupServer(serverAddress string) net.PacketConn {
 	socket, err := net.ListenPacket("udp", serverAddress)
 	util.HandleError(err)
 
-	fmt.Printf("Listening on %s\n", serverAddress)
+	log.Printf("SERVER: Listening on %s\n", serverAddress)
 
 	return socket
 }
@@ -28,22 +30,23 @@ func readFromSocket(socket net.PacketConn, buffer []byte) (int, net.Addr) {
 
 // TODO: Implement packet loss detection logic
 func isPacketLossDetected(socket net.PacketConn) bool {
-	fmt.Println("Verifying for potential packet loss")
+	//log.Println("SERVER: Verifying for potential packet loss")
 	return false
 }
 
 func processRequest(socket net.PacketConn, addr net.Addr, request string, videoData []byte) {
-	fmt.Printf("Received request from %s: %s\n", addr.String(), request)
+	log.Printf("SERVER: Received request from %s: %s\n", addr.String(), request)
 
 	chunks := util.SplitIntoChunks(videoData, 1024)
 	for i, chunk := range chunks {
 		// Send packet
 		util.SendPacket(socket, addr, i, chunk, entity.STREAMING)
-
+		// avoid packet loss
+		time.Sleep(5 * time.Millisecond)
 		// Check for packet loss and retransmit if necessary
 		if isPacketLossDetected(socket) {
-			fmt.Printf("Packet loss detected for sequence number: %d\n", i)
-			util.SendPacket(socket, addr, i, chunk, entity.STREAMING)
+			log.Printf("SERVER: Packet loss detected for sequence number: %d\n", i)
+			//util.SendPacket(socket, addr, i, chunk, entity.STREAMING)
 		}
 	}
 
@@ -85,6 +88,10 @@ func getNode(bootstrapAddress, serverAddress string) *entity.Node {
 
 	// Receive the Node information from the bootstrap server
 	node := util.ReceiveNode(socket)
+
+	if node == nil {
+		util.HandleError(fmt.Errorf("node not found"))
+	}
 
 	return node
 }

@@ -2,7 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -27,30 +27,31 @@ func readNodesFromFile(filepath string) []entity.Node {
 func processNode(socket net.PacketConn, nodes []entity.Node, fullAddr net.Addr) {
 	// Extract the IP address from the fullAddr net.Addr
 	addr := strings.Split(fullAddr.String(), ":")[0]
-	fmt.Println(fullAddr)
 	for _, node := range nodes {
 		if node.Address == addr {
 			// Send the node information using the provided socket to the address represented by fullAddr
 			util.SendNode(socket, fullAddr, node)
-
-			fmt.Println("Sent node to", node.FullAddress)
+			log.Printf("BOOTSTRAPPER: node found %s\n", node.FullAddress)
 			return
 		}
 	}
+	log.Println("BOOTSTRAPPER: node not found")
+	socket.WriteTo([]byte("NOT_FOUND"), fullAddr)
 }
 
 func handleBootstrapRequest(serverAddress string, nodes []entity.Node, readySignal chan<- struct{}) {
-	socket := setupServer(serverAddress)
+	socket, err := net.ListenPacket("udp", serverAddress)
+	util.HandleError(err)
+
+	log.Printf("BOOTSTRAPPER: Listening on %s\n", serverAddress)
 	defer socket.Close()
 
 	buffer := make([]byte, 2024)
-	// add a channel here to notify the main thread that the bootstrap server is ready
+	// notify the main thread that the bootstrap server is ready
 	close(readySignal)
 
 	for {
-
 		_, address := readFromSocket(socket, buffer)
-
 		go processNode(socket, nodes, address)
 	}
 }

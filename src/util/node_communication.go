@@ -11,8 +11,13 @@ import (
 func ReceiveNode(socket net.PacketConn) *entity.Node {
 	// Read packet
 	readBuff := make([]byte, 2024)
-	_, _, err := socket.ReadFrom(readBuff)
+	n, _, err := socket.ReadFrom(readBuff)
 	HandleError(err)
+
+	// If node not on bootstrap
+	if string(readBuff[:n]) == "NOT_FOUND" {
+		return nil
+	}
 
 	// Decode packet
 	decodeBuff := bytes.NewBuffer(readBuff)
