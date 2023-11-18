@@ -1,4 +1,4 @@
-package server
+package bootstrapper
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brandao07/esr-tp2/src/entity"
+	"github.com/brandao07/esr-tp2/src/nodenet"
 )
 
 func TestNodeUnmarshal(t *testing.T) {
@@ -17,27 +17,27 @@ func TestNodeUnmarshal(t *testing.T) {
 		return
 	}
 
-	var nodes []entity.Node
+	var nodes []nodenet.Node
 	err = json.Unmarshal(jsonData, &nodes)
 	if err != nil {
 		t.Errorf("Error unmarshaling JSON: %v", err)
 		return
 	}
 
-	serverAddress := nodes[0].Address + ":" + nodes[0].BootstrapPort
+	serverAddress := nodes[0].Address + ":" + "10001"
 	t.Log(serverAddress)
 }
 
 func TestRunBootstrap(t *testing.T) {
 	// Start the bootstrap server in a goroutine
 	go func() {
-		RunBootstrap("../../bootstrapper.json")
+		Run("../../bootstrapper.json")
 	}()
 
 	// Wait for the bootstrap server to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	node := getNode("127.0.0.1:10001", "127.0.0.1:30000")
+	node := nodenet.GetNode("127.0.0.1:10001", "127.0.0.1:30000")
 	if node == nil {
 		t.Errorf("Node not found")
 		return
