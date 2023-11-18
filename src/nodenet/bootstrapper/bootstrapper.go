@@ -5,10 +5,8 @@ import (
 	"log"
 	"net"
 	"os"
-	"strings"
 
 	"github.com/brandao07/esr-tp2/src/nodenet"
-	"github.com/brandao07/esr-tp2/src/nodenet/server"
 	"github.com/brandao07/esr-tp2/src/util"
 )
 
@@ -25,45 +23,47 @@ func readNodesFromFile(filepath string) []nodenet.Node {
 	return nodes
 }
 
-func processNode(socket net.PacketConn, nodes []nodenet.Node, fullAddr net.Addr) {
-	// Extract the IP address from the fullAddr net.Addr
-	addr := strings.Split(fullAddr.String(), ":")[0]
+func SendNode(socket net.PacketConn, addr net.Addr, node nodenet.Node) {
+	// Send node
+	_, err := socket.WriteTo(node.EncodeNode(), addr)
+	util.HandleError(err)
+}
+
+func processNode(socket net.PacketConn, nodes []nodenet.Node, id []byte, addr net.Addr) {
 	for _, node := range nodes {
-		if node.Address == addr {
+		if node.Id == string(id) {
 			// Send the node information using the provided socket to the address represented by fullAddr
-			nodenet.SendNode(socket, fullAddr, node)
-			log.Printf("BOOTSTRAPPER: node found %s\n", node.FullAddress)
+			SendNode(socket, addr, node)
+			log.Printf("BOOTSTRAPPER: node found %s\n", addr)
 			return
 		}
 	}
 	log.Println("BOOTSTRAPPER: node not found")
-	socket.WriteTo([]byte("NOT_FOUND"), fullAddr)
+	socket.WriteTo([]byte("NOT_FOUND"), addr)
 }
 
-func handleBootstrapRequest(serverAddress string, nodes []nodenet.Node, readySignal chan<- struct{}) {
-	socket, err := net.ListenPacket("udp", serverAddress)
-	util.HandleError(err)
-
-	log.Printf("BOOTSTRAPPER: Listening on %s\n", serverAddress)
+func handleBootstrapRequest(addr string, nodes []nodenet.Node, readySignal chan<- struct{}) {
+	socket := nodenet.SetupSocket(addr)
 	defer socket.Close()
+	log.Printf("BOOTSTRAPPER: Listening on %s\n", addr)
 
-	buffer := make([]byte, 2024)
+	buffer := make([]byte, 1024)
 	// notify the main thread that the bootstrap server is ready
 	close(readySignal)
 
 	for {
-		_, address := nodenet.ReadFromSocket(socket, buffer)
-		go processNode(socket, nodes, address)
+		n, addr := nodenet.ReadFromSocket(socket, buffer)
+		go processNode(socket, nodes, buffer[:n], addr)
 	}
 }
 
 func Run(filePath string) {
 	nodes := readNodesFromFile(filePath)
-	serverAddress := nodes[0].Address + ":" + "10001"
+	bootAddr := nodes[0].Address + ":" + "10001"
 	bootstrapReady := make(chan struct{})
-	go handleBootstrapRequest(serverAddress, nodes, bootstrapReady)
+	go handleBootstrapRequest(bootAddr, nodes, bootstrapReady)
 
 	// Wait for the bootstrap server to be ready
 	<-bootstrapReady
-	server.Run(serverAddress, "n1")
+	nodenet.Run(&nodes[0])
 }

@@ -20,7 +20,4 @@ clean:
 	@rm -d ./cmd
 	@rm -f out.mjpeg
 
-# Build and run the application
-all: build run
-
 .PHONY: build run clean all

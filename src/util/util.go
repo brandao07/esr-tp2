@@ -25,3 +25,12 @@ func SplitIntoChunks(data []byte, chunkSize int) [][]byte {
 
 	return chunks
 }
+
+func ContainsString(s []string, search string) bool {
+	for _, val := range s {
+		if val == search {
+			return true
+		}
+	}
+	return false
+}

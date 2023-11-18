@@ -25,12 +25,14 @@ func main() {
 		bootstrapper.Run("bootstrapper.json")
 	case "Node":
 		validateArgs(3, "insufficient number of arguments for Node mode")
-		nodenet.Run(os.Args[2], os.Args[3])
+		node := nodenet.GetNode(os.Args[2], os.Args[3])
+		nodenet.Run(node)
 	case "Server":
-		validateArgs(3, "insufficient number of arguments for Server mode")
-		server.Run(os.Args[2], os.Args[3])
+		validateArgs(4, "insufficient number of arguments for Server mode")
+		node := nodenet.GetNode(os.Args[2], os.Args[3])
+		server.Run(node, os.Args[4])
 	case "Client":
-		validateArgs(4, "insufficient number of arguments for Client mode")
+		validateArgs(3, "insufficient number of arguments for Client mode")
 		client.Run(os.Args[2], os.Args[3])
 	default:
 		util.HandleError(errors.New("invalid argument for type! (Bootstrap, Server, Client)"))
