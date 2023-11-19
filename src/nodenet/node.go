@@ -20,6 +20,8 @@ type Node struct {
 
 var videos = []string{}
 
+var subscribers = []string{}
+
 func (n *Node) DecodeNode(buff []byte) {
 	// Decode node
 	decodeBuff := bytes.NewBuffer(buff)
@@ -101,35 +103,66 @@ func requestVideoStreaming(socket net.PacketConn, serverAddr, payload string) {
 	util.HandleError(err)
 }
 
-func streamingRequestHandler(wg *sync.WaitGroup, node *Node) {
+func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn) {
+	defer (*wg).Done()
+	defer (*socket).Close()
+
+	var buffer []byte
+	for {
+		buffer = make([]byte, 2024)
+		_, _ = ReadFromSocket(*socket, buffer)
+		go streamToSubscribers(buffer, socket)
+	}
+}
+
+func streamToSubscribers(buffer []byte, socket *net.PacketConn) {
+	for _, subscriber := range subscribers {
+		go func(buff []byte, sub string) {
+			addr, err := net.ResolveUDPAddr("udp", sub)
+			util.HandleError(err)
+			_, err = (*socket).WriteTo(buffer, addr)
+			util.HandleError(err)
+		}(buffer, subscriber)
+	}
+}
+
+func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.PacketConn) {
 	nodeAddr := node.Address + ":" + node.Port
 	socket := SetupSocket(nodeAddr)
 	log.Printf("NODE: Listening on %s\n", socket.LocalAddr().String())
-	buffer := make([]byte, 1024)
 
 	defer socket.Close()
 	defer (*wg).Done()
 
-	for {
-		n, _ := ReadFromSocket(socket, buffer)
-		req := string(buffer[:n])
-		if util.ContainsString(videos, req) {
-			//TODO: Locate the thread that is streaming the video and send the video data to the client
-			log.Printf("NODE: Video %s already being streamed\n", req)
-		} else {
-			//TODO: Send request to neighbours
-			requestVideoStreaming(socket, "", req)
-		}
-		//TODO: replace "video data" with the actual video data
+	var buffer []byte
 
+	for {
+		buffer = make([]byte, 2024)
+		n, addr := ReadFromSocket(socket, buffer)
+		req := string(buffer[:n])
+
+		// if the incoming request address is not a subscriber
+		if !util.ContainsString(subscribers, addr.String()) {
+			log.Println("NODE: New subscriber: " + addr.String())
+			subscribers = append(subscribers, addr.String())
+		}
+
+		// if the node doesnt have the requested video
+		if !util.ContainsString(videos, req) {
+			log.Println("NODE: Video not found. Requesting video: " + req)
+			for _, neighbour := range node.Neighbours {
+				go requestVideoStreaming(*streamSocket, neighbour.Address+":"+neighbour.Port, req)
+			}
+		}
 	}
 }
 
-func Run(node *Node) {
+func Run(node *Node, streamAddr string) {
 	var wg sync.WaitGroup
-
+	socket := SetupSocket(streamAddr)
+	log.Printf("NODE: Streaming on %s\n", socket.LocalAddr().String())
 	wg.Add(2)
-	//go startVideoStreaming()
-	go streamingRequestHandler(&wg, node)
+	go startVideoStreaming(&wg, &socket)
+	go streamingRequestHandler(&wg, node, &socket)
 	wg.Wait()
 }

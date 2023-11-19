@@ -34,7 +34,7 @@ func processNode(socket net.PacketConn, nodes []nodenet.Node, id []byte, addr ne
 		if node.Id == string(id) {
 			// Send the node information using the provided socket to the address represented by fullAddr
 			SendNode(socket, addr, node)
-			log.Printf("BOOTSTRAPPER: node found %s\n", addr)
+			log.Printf("BOOTSTRAPPER: node found %s\n", node.Address+":"+node.Port)
 			return
 		}
 	}
@@ -65,5 +65,5 @@ func Run(filePath string) {
 
 	// Wait for the bootstrap server to be ready
 	<-bootstrapReady
-	nodenet.Run(&nodes[0])
+	nodenet.Run(&nodes[0], "")
 }

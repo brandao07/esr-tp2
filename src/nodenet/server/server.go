@@ -20,9 +20,8 @@ func startVideoStreaming(node nodenet.Node, videoFile string) {
 	socket := nodenet.SetupSocket("")
 	defer socket.Close()
 
-	addr, err := net.ResolveUDPAddr("udp", node.Address+":"+node.Port)
+	addr, err := net.ResolveUDPAddr("udp", node.Address+":8080")
 	util.HandleError(err)
-
 	videoData, err := os.ReadFile(videoFile)
 	util.HandleError(err)
 
@@ -34,5 +33,5 @@ func startVideoStreaming(node nodenet.Node, videoFile string) {
 
 func Run(node *nodenet.Node, videoFile string) {
 	go startVideoStreaming(*node, videoFile)
-	nodenet.Run(node)
+	nodenet.Run(node, "localhost:8080")
 }
