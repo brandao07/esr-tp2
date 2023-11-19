@@ -26,7 +26,7 @@ func main() {
 	case "Node":
 		validateArgs(3, "insufficient number of arguments for Node mode")
 		node := nodenet.GetNode(os.Args[2], os.Args[3])
-		nodenet.Run(node, "")
+		nodenet.StartNode(node)
 	case "Server":
 		validateArgs(4, "insufficient number of arguments for Server mode")
 		node := nodenet.GetNode(os.Args[2], os.Args[3])

@@ -33,5 +33,5 @@ func startVideoStreaming(node nodenet.Node, videoFile string) {
 
 func Run(node *nodenet.Node, videoFile string) {
 	go startVideoStreaming(*node, videoFile)
-	nodenet.Run(node, "localhost:8080")
+	nodenet.StartServerNode(node, videoFile)
 }

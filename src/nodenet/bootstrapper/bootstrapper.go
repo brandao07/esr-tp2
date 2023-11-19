@@ -47,11 +47,12 @@ func handleBootstrapRequest(addr string, nodes []nodenet.Node, readySignal chan<
 	defer socket.Close()
 	log.Printf("BOOTSTRAPPER: Listening on %s\n", addr)
 
-	buffer := make([]byte, 1024)
 	// notify the main thread that the bootstrap server is ready
 	close(readySignal)
 
+	var buffer []byte
 	for {
+		buffer = make([]byte, 2024)
 		n, addr := nodenet.ReadFromSocket(socket, buffer)
 		go processNode(socket, nodes, buffer[:n], addr)
 	}
@@ -65,5 +66,5 @@ func Run(filePath string) {
 
 	// Wait for the bootstrap server to be ready
 	<-bootstrapReady
-	nodenet.Run(&nodes[0], "")
+	nodenet.StartNode(&nodes[0])
 }

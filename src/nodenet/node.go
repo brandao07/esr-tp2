@@ -150,6 +150,7 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		// if the node doesnt have the requested video
 		if !util.ContainsString(videos, req) {
 			log.Println("NODE: Video not found. Requesting video: " + req)
+			videos = append(videos, req)
 			for _, neighbour := range node.Neighbours {
 				go requestVideoStreaming(*streamSocket, neighbour.Address+":"+neighbour.Port, req)
 			}
@@ -157,10 +158,23 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 	}
 }
 
-func Run(node *Node, streamAddr string) {
+func StartNode(node *Node) {
 	var wg sync.WaitGroup
-	socket := SetupSocket(streamAddr)
+	socket := SetupSocket("")
 	log.Printf("NODE: Streaming on %s\n", socket.LocalAddr().String())
+
+	wg.Add(2)
+	go startVideoStreaming(&wg, &socket)
+	go streamingRequestHandler(&wg, node, &socket)
+	wg.Wait()
+}
+
+func StartServerNode(node *Node, videoFile string) {
+	var wg sync.WaitGroup
+	socket := SetupSocket("localhost:8080")
+	log.Printf("NODE: Streaming on %s\n", socket.LocalAddr().String())
+	videos = append(videos, videoFile)
+
 	wg.Add(2)
 	go startVideoStreaming(&wg, &socket)
 	go streamingRequestHandler(&wg, node, &socket)
