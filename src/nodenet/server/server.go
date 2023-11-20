@@ -9,13 +9,6 @@ import (
 	"github.com/brandao07/esr-tp2/src/util"
 )
 
-func streamVideoChunks(socket net.PacketConn, addr net.Addr, videoData []byte) {
-	chunks := util.SplitIntoChunks(videoData, 1024)
-	for i, chunk := range chunks {
-		nodenet.SendPacket(socket, addr, i, chunk, nodenet.STREAMING)
-	}
-}
-
 func startVideoStreaming(node nodenet.Node, videoFile string) {
 	socket := nodenet.SetupSocket("")
 	defer socket.Close()
@@ -26,8 +19,16 @@ func startVideoStreaming(node nodenet.Node, videoFile string) {
 	util.HandleError(err)
 
 	log.Printf("SERVER: Streaming to %s\n", addr)
+
+	chunks := util.SplitIntoChunks(videoData, 1024)
+
+	i := 0
+
 	for {
-		streamVideoChunks(socket, addr, videoData)
+		for _, chunk := range chunks {
+			nodenet.SendPacket(socket, addr, i, chunk, nodenet.STREAMING)
+			i++
+		}
 	}
 }
 
