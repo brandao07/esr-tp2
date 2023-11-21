@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	"github.com/brandao07/esr-tp2/src/nodenet"
 	"github.com/brandao07/esr-tp2/src/util"
@@ -27,6 +28,7 @@ func startVideoStreaming(node nodenet.Node, videoFile string) {
 	for {
 		for _, chunk := range chunks {
 			nodenet.SendPacket(socket, addr, i, chunk, nodenet.STREAMING)
+			time.Sleep(2 * time.Millisecond)
 			i++
 		}
 	}

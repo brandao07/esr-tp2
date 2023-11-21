@@ -34,3 +34,15 @@ func ContainsString(s []string, search string) bool {
 	}
 	return false
 }
+
+func RemoveString(slice []string, strToRemove string) []string {
+	var result []string
+
+	for _, str := range slice {
+		if str != strToRemove {
+			result = append(result, str)
+		}
+	}
+
+	return result
+}

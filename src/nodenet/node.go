@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	"github.com/brandao07/esr-tp2/src/util"
 )
@@ -21,6 +24,8 @@ type Node struct {
 var videos = []string{}
 
 var subscribers = []string{}
+
+var publisher = ""
 
 func (n *Node) DecodeNode(buff []byte) {
 	// Decode node
@@ -94,7 +99,7 @@ func GetNode(bootAddr, id string) *Node {
 	return node
 }
 
-func requestVideoStreaming(socket net.PacketConn, serverAddr, payload string) {
+func sendRequest(socket net.PacketConn, serverAddr, payload string) {
 	addr, err := net.ResolveUDPAddr("udp", serverAddr)
 	util.HandleError(err)
 
@@ -106,11 +111,20 @@ func requestVideoStreaming(socket net.PacketConn, serverAddr, payload string) {
 func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn) {
 	defer (*wg).Done()
 	defer (*socket).Close()
-
 	var buffer []byte
 	for {
 		buffer = make([]byte, 2024)
-		_, _ = ReadFromSocket(*socket, buffer)
+		_, addr := ReadFromSocket(*socket, buffer)
+
+		if publisher == "" {
+			publisher = addr.String()
+			log.Println("NODE: Found a publisher: " + publisher)
+		}
+
+		// if the incoming request address is not a different publisher
+		if addr.String() != publisher {
+			sendRequest(*socket, addr.String(), "STOP_STREAMING")
+		}
 		go streamToSubscribers(buffer, socket)
 	}
 }
@@ -126,7 +140,7 @@ func streamToSubscribers(buffer []byte, socket *net.PacketConn) {
 	}
 }
 
-func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.PacketConn) {
+func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.PacketConn, mode string) {
 	nodeAddr := node.Address + ":" + node.Port
 	socket := SetupSocket(nodeAddr)
 	log.Printf("NODE: Listening on %s\n", socket.LocalAddr().String())
@@ -136,10 +150,38 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 
 	var buffer []byte
 
+	// Handling interrupt signal (CTRL+C)
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-interrupt
+		fmt.Println("\nReceived interrupt signal. Cleaning up...")
+		for _, neighbour := range node.Neighbours {
+			sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, "STOP_STREAMING")
+		}
+		os.Exit(0)
+	}()
+
 	for {
 		buffer = make([]byte, 2024)
 		n, addr := ReadFromSocket(socket, buffer)
 		req := string(buffer[:n])
+
+		if req == "STOP_STREAMING" {
+			log.Println("NODE: Stopping streaming to node: " + addr.String())
+			subscribers = util.RemoveString(subscribers, addr.String())
+			if mode == "DEFAULT" {
+				if len(subscribers) == 0 {
+					log.Println("NODE: No more subscribers. Stopping streaming.")
+					videos = []string{}
+					publisher = ""
+					for _, neighbour := range node.Neighbours {
+						go sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, "STOP_STREAMING")
+					}
+				}
+			}
+			continue
+		}
 
 		// if the incoming request address is not a subscriber
 		if !util.ContainsString(subscribers, addr.String()) {
@@ -152,7 +194,7 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 			log.Println("NODE: Video not found. Requesting video: " + req)
 			videos = append(videos, req)
 			for _, neighbour := range node.Neighbours {
-				go requestVideoStreaming(*streamSocket, neighbour.Address+":"+neighbour.Port, req)
+				go sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, req)
 			}
 		}
 	}
@@ -165,7 +207,7 @@ func StartNode(node *Node) {
 
 	wg.Add(2)
 	go startVideoStreaming(&wg, &socket)
-	go streamingRequestHandler(&wg, node, &socket)
+	go streamingRequestHandler(&wg, node, &socket, "DEFAULT")
 	wg.Wait()
 }
 
@@ -177,6 +219,6 @@ func StartServerNode(node *Node, videoFile string) {
 
 	wg.Add(2)
 	go startVideoStreaming(&wg, &socket)
-	go streamingRequestHandler(&wg, node, &socket)
+	go streamingRequestHandler(&wg, node, &socket, "SERVER")
 	wg.Wait()
 }

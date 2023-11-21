@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+
 	"os"
 
 	"github.com/brandao07/esr-tp2/src/nodenet"
@@ -34,6 +35,7 @@ func main() {
 	case "Client":
 		validateArgs(3, "insufficient number of arguments for Client mode")
 		client.Run(os.Args[2], os.Args[3])
+	case "Test":
 	default:
 		util.HandleError(errors.New("invalid argument for type! (Bootstrap, Server, Client)"))
 	}
