@@ -64,16 +64,17 @@ func startVideoStreaming(addr, payload string, wg *sync.WaitGroup, videoFile *os
 func Run(serverAddr, filename string) {
 	var wg sync.WaitGroup
 	// Create a file to write the incoming video data
-	videoFile, err := os.Create("out.mjpeg")
+	out := fmt.Sprintf("./out/out-%d.mjpeg", time.Now().UnixNano()/int64(time.Millisecond))
+	videoFile, err := os.Create(out)
 	util.HandleError(err)
 	defer videoFile.Close()
 
 	wg.Add(1)
 	go startVideoStreaming(serverAddr, filename, &wg, videoFile)
-
+	// $ vlc --no-one-instance out
 	// Start playing the video file with VLC after a delay
 	time.Sleep(15 * time.Second)
-	cmd := exec.Command("open", "-a", "vlc", "out.mjpeg")
+	cmd := exec.Command("open", "-a", "vlc", out)
 	err = cmd.Start()
 	util.HandleError(err)
 

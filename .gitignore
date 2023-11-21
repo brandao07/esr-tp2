@@ -2,5 +2,5 @@
 /cmd
 /.vscode
 movie.Mjpeg
-out.mjpeg
+/out
 /bootstrapper.json
