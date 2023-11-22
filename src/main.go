@@ -35,7 +35,10 @@ func main() {
 	case "Client":
 		validateArgs(3, "insufficient number of arguments for Client mode")
 		client.Run(os.Args[2], os.Args[3])
-	case "Test":
+	case "RP":
+		validateArgs(3, "insufficient number of arguments for RP mode")
+		node := nodenet.GetNode(os.Args[2], os.Args[3])
+		nodenet.StartRPNode(node)
 	default:
 		util.HandleError(errors.New("invalid argument for type! (Bootstrap, Server, Client)"))
 	}

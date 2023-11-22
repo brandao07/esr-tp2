@@ -37,11 +37,13 @@ This program provides a Makefile to simplify the build and execution process.
     - `Node`: Participate in the streaming network.
     - `Server`: Stream content.
     - `Client`: Receive and display streamed content.
+    - `RP`: Rendevous Point for the streaming network.
 
     Provide additional arguments based on the selected mode. Examples:
 
-    - For `Node` mode: `make run ARGS="Node bootstrap_address myNodeId"`
-    - For `Server` mode: `make run ARGS="Server bootstrap_address myNodeId video_to_stream"`
+    - For `Node` mode: `make run ARGS="Node bootstrap_address my_node_id"`
+    - For `RP` mode: `make run ARGS="RP bootstrap_address my_node_id"`
+    - For `Server` mode: `make run ARGS="Server bootstrap_address my_node_id video_to_stream"`
     - For `Client` mode: `make run ARGS="Client node_address video_to_stream"`
 
 - **Clean Build Artifacts:**

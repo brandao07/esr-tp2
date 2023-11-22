@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"encoding/binary"
 	"log"
 	"net"
 	"os"
@@ -27,7 +29,16 @@ func startVideoStreaming(node nodenet.Node, videoFile string) {
 
 	for {
 		for _, chunk := range chunks {
-			nodenet.SendPacket(socket, addr, i, chunk, nodenet.STREAMING)
+			// Convert packet id to byte array
+			idBuff := new(bytes.Buffer)
+			err := binary.Write(idBuff, binary.LittleEndian, uint64(i))
+			util.HandleError(err)
+			pac := nodenet.Packet{
+				Id:    idBuff.Bytes(),
+				Data:  chunk,
+				State: nodenet.STREAMING,
+			}
+			nodenet.SendPacket(socket, addr, &pac)
 			time.Sleep(2 * time.Millisecond)
 			i++
 		}

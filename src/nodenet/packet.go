@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"net"
+	"time"
 
 	"github.com/brandao07/esr-tp2/src/util"
 )
@@ -12,15 +13,21 @@ import (
 type PacketState string
 
 const (
-	STREAMING  PacketState = "STREAMING"
-	REQUESTING PacketState = "REQUESTING"
+	STREAMING      PacketState = "STREAMING"
+	REQUESTING     PacketState = "REQUESTING"
+	STOP_STREAMING PacketState = "STOP_STREAMING"
+	ABORT          PacketState = "ABORT"
 )
 
 type Packet struct {
-	Id    []byte
-	Data  []byte
-	State []byte
-	//Timestamp time.Time //TODO: Add Timestamp to Packet
+	Id          []byte
+	Data        []byte
+	State       PacketState
+	File        string
+	Source      string
+	Destination string
+	Path        []string
+	Timestamp   time.Time
 }
 
 func DecodePacket(buff []byte) *Packet {
@@ -43,24 +50,13 @@ func EncodePacket(pac *Packet) []byte {
 	return encodeBuff.Bytes()
 }
 
-func SendPacket(socket net.PacketConn, addr net.Addr, id int, data []byte, state PacketState) {
-	// Convert packet id to byte array
-	idBuff := new(bytes.Buffer)
-	err := binary.Write(idBuff, binary.LittleEndian, uint64(id))
-	util.HandleError(err)
-
-	pac := Packet{
-		Id:    idBuff.Bytes(),
-		Data:  data,
-		State: []byte(state),
-	}
-
+func SendPacket(socket net.PacketConn, addr net.Addr, packet *Packet) {
 	// Send packet
-	_, err = socket.WriteTo(EncodePacket(&pac), addr)
+	_, err := socket.WriteTo(EncodePacket(packet), addr)
 	util.HandleError(err)
 }
 
-func GetPacketId(pac *Packet) (uint64, error) {
+func (pac *Packet) DecodeId() (uint64, error) {
 	var id uint64
 	readBuf := bytes.NewReader(pac.Id)
 	err := binary.Read(readBuf, binary.LittleEndian, &id)

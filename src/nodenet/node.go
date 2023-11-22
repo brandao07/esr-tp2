@@ -18,8 +18,17 @@ type Node struct {
 	Id         string `json:"id"`
 	Address    string `json:"address"`
 	Port       string `json:"port"`
+	Server     bool   `json:"server"`
 	Neighbours []Node `json:"neighbours"`
 }
+
+type NodeType string
+
+const (
+	DEFAULT NodeType = "DEFAULT"
+	RP      NodeType = "RP"
+	SERVER  NodeType = "SERVER"
+)
 
 var videos = []string{}
 
@@ -99,16 +108,15 @@ func GetNode(bootAddr, id string) *Node {
 	return node
 }
 
-func sendRequest(socket net.PacketConn, serverAddr, payload string) {
+func sendRequest(socket net.PacketConn, serverAddr string, pac *Packet) {
 	addr, err := net.ResolveUDPAddr("udp", serverAddr)
 	util.HandleError(err)
-
-	_, err = socket.WriteTo([]byte(payload), addr)
-	log.Printf("NODE: Sending request to %s: %s\n", serverAddr, payload)
+	log.Printf("NODE: Sending request to %s: %s\n", serverAddr, pac.State)
+	_, err = socket.WriteTo(EncodePacket(pac), addr)
 	util.HandleError(err)
 }
 
-func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn) {
+func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node) {
 	defer (*wg).Done()
 	defer (*socket).Close()
 	var buffer []byte
@@ -116,6 +124,7 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn) {
 		buffer = make([]byte, 2024)
 		_, addr := ReadFromSocket(*socket, buffer)
 
+		// if the node does not have a publisher yet
 		if publisher == "" {
 			publisher = addr.String()
 			log.Println("NODE: Found a publisher: " + publisher)
@@ -123,7 +132,15 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn) {
 
 		// if the incoming request address is not a different publisher
 		if addr.String() != publisher {
-			sendRequest(*socket, addr.String(), "STOP_STREAMING")
+			go func() {
+				pac := DecodePacket(buffer)
+				log.Println("NODE: Already streaming from another publisher")
+				pac.State = STOP_STREAMING
+				pac.Source = addr.String()
+				for _, neighbour := range node.Neighbours {
+					sendRequest(*socket, neighbour.Address+":"+neighbour.Port, pac)
+				}
+			}()
 		}
 		go streamToSubscribers(buffer, socket)
 	}
@@ -140,7 +157,7 @@ func streamToSubscribers(buffer []byte, socket *net.PacketConn) {
 	}
 }
 
-func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.PacketConn, mode string) {
+func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.PacketConn, nodeType NodeType) {
 	nodeAddr := node.Address + ":" + node.Port
 	socket := SetupSocket(nodeAddr)
 	log.Printf("NODE: Listening on %s\n", socket.LocalAddr().String())
@@ -156,30 +173,44 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 	go func() {
 		<-interrupt
 		fmt.Println("\nReceived interrupt signal. Cleaning up...")
+		pac := Packet{
+			State: ABORT,
+		}
 		for _, neighbour := range node.Neighbours {
-			sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, "STOP_STREAMING")
+			sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, &pac)
 		}
 		os.Exit(0)
 	}()
 
 	for {
 		buffer = make([]byte, 2024)
-		n, addr := ReadFromSocket(socket, buffer)
-		req := string(buffer[:n])
+		_, addr := ReadFromSocket(socket, buffer)
+		req := DecodePacket(buffer)
 
-		if req == "STOP_STREAMING" {
-			log.Println("NODE: Stopping streaming to node: " + addr.String())
-			subscribers = util.RemoveString(subscribers, addr.String())
-			if mode == "DEFAULT" {
-				if len(subscribers) == 0 {
-					log.Println("NODE: No more subscribers. Stopping streaming.")
-					videos = []string{}
-					publisher = ""
-					for _, neighbour := range node.Neighbours {
-						go sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, "STOP_STREAMING")
+		if req.State == STOP_STREAMING {
+			go func() {
+				log.Println("NODE: Stop streaming request received")
+				// FIXME: Use full Address instead of Port
+				_, reqPort, err := net.SplitHostPort(req.Source)
+				util.HandleError(err)
+				_, streamPort, err := net.SplitHostPort((*streamSocket).LocalAddr().String())
+				util.HandleError(err)
+				if (reqPort != streamPort) && req.State != ABORT {
+					return
+				}
+				log.Println("NODE: Stopping streaming to node: " + addr.String())
+				subscribers = util.RemoveString(subscribers, addr.String())
+				if nodeType != SERVER {
+					if len(subscribers) == 0 {
+						log.Println("NODE: No more subscribers. Stopping streaming.")
+						videos = []string{}
+						publisher = ""
+						for _, neighbour := range node.Neighbours {
+							go sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, req)
+						}
 					}
 				}
-			}
+			}()
 			continue
 		}
 
@@ -190,11 +221,20 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		}
 
 		// if the node doesnt have the requested video
-		if !util.ContainsString(videos, req) {
-			log.Println("NODE: Video not found. Requesting video: " + req)
-			videos = append(videos, req)
-			for _, neighbour := range node.Neighbours {
-				go sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, req)
+		if !util.ContainsString(videos, req.File) {
+			log.Println("NODE: Video not found. Requesting video: " + req.File)
+			videos = append(videos, req.File)
+			// if the node is a RP it looks directly for the SERVER
+			if nodeType == RP {
+				for _, neighbour := range node.Neighbours {
+					if neighbour.Server {
+						sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, req)
+					}
+				}
+			} else {
+				for _, neighbour := range node.Neighbours {
+					go sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, req)
+				}
 			}
 		}
 	}
@@ -202,23 +242,37 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 
 func StartNode(node *Node) {
 	var wg sync.WaitGroup
+	//FIXME: change to 8080
 	socket := SetupSocket("")
 	log.Printf("NODE: Streaming on %s\n", socket.LocalAddr().String())
 
 	wg.Add(2)
-	go startVideoStreaming(&wg, &socket)
-	go streamingRequestHandler(&wg, node, &socket, "DEFAULT")
+	go startVideoStreaming(&wg, &socket, node)
+	go streamingRequestHandler(&wg, node, &socket, DEFAULT)
 	wg.Wait()
 }
 
 func StartServerNode(node *Node, videoFile string) {
 	var wg sync.WaitGroup
+	//FIXME: change to 8080
 	socket := SetupSocket("localhost:8080")
 	log.Printf("NODE: Streaming on %s\n", socket.LocalAddr().String())
 	videos = append(videos, videoFile)
 
 	wg.Add(2)
-	go startVideoStreaming(&wg, &socket)
-	go streamingRequestHandler(&wg, node, &socket, "SERVER")
+	go startVideoStreaming(&wg, &socket, node)
+	go streamingRequestHandler(&wg, node, &socket, SERVER)
+	wg.Wait()
+}
+
+func StartRPNode(node *Node) {
+	var wg sync.WaitGroup
+	//FIXME: change to 8080
+	socket := SetupSocket("")
+	log.Printf("RP: Streaming on %s\n", socket.LocalAddr().String())
+
+	wg.Add(2)
+	go startVideoStreaming(&wg, &socket, node)
+	go streamingRequestHandler(&wg, node, &socket, RP)
 	wg.Wait()
 }
