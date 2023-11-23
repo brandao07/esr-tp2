@@ -187,7 +187,7 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		_, addr := ReadFromSocket(socket, buffer)
 		req := DecodePacket(buffer)
 
-		if req.State == STOP_STREAMING {
+		if req.State == STOP_STREAMING || req.State == ABORT {
 			go func() {
 				log.Println("NODE: Stop streaming request received")
 				// FIXME: Use full Address instead of Port
