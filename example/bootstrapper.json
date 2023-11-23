@@ -1,62 +1,87 @@
 [
   {
+    "id": "n1",
     "address": "127.0.0.1",
     "port": "10000",
-    "fullAddress": "127.0.0.1:10000",
-    "type": "Bootstrap",
-    "bootstrapPort": "10001",
     "neighbours": [
       {
+        "id": "n3",
         "address": "127.0.0.1",
-        "port": "20000",
-        "fullAddress": "127.0.0.1:20000",
-        "type": "Server"
+        "port": "30000"
       },
       {
+        "id": "n4",
         "address": "127.0.0.1",
-        "port": "30000",
-        "fullAddress": "127.0.0.1:30000",
-        "type": "Server"
+        "port": "40000"
       }
     ]
   },
   {
+    "id": "n2",
     "address": "127.0.0.1",
     "port": "20000",
-    "fullAddress": "127.0.0.1:20000",
-    "type": "Server",
     "neighbours": [
       {
+        "n1": "n3",
         "address": "127.0.0.1",
-        "port": "10000",
-        "fullAddress": "127.0.0.1:10000",
-        "type": "Server"
-      },
-      {
-        "address": "127.0.0.1",
-        "port": "30000",
-        "fullAddress": "127.0.0.1:30000",
-        "type": "Server"
+        "port": "30000"
       }
     ]
   },
   {
+    "id": "n3",
     "address": "127.0.0.1",
     "port": "30000",
-    "fullAddress": "127.0.0.1:30000",
-    "type": "Server",
     "neighbours": [
       {
+        "id": "n2",
+        "server": true,
         "address": "127.0.0.1",
-        "port": "10000",
-        "fullAddress": "127.0.0.1:10000",
-        "type": "Server"
+        "port": "20000"
       },
       {
+        "id": "n1",
         "address": "127.0.0.1",
-        "port": "20000",
-        "fullAddress": "127.0.0.1:20000",
-        "type": "Server"
+        "port": "10000"
+      },
+      {
+        "id": "n5",
+        "address": "127.0.0.1",
+        "port": "50000"
+      },
+      {
+        "id": "n4",
+        "address": "127.0.0.1",
+        "port": "40000"
+      }
+    ]
+  },
+  {
+    "id": "n4",
+    "address": "127.0.0.1",
+    "port": "40000",
+    "neighbours": [
+      {
+        "id": "n1",
+        "address": "127.0.0.1",
+        "port": "10000"
+      },
+      {
+        "id": "n3",
+        "address": "127.0.0.1",
+        "port": "30000"
+      }
+    ]
+  },
+  {
+    "id": "n5",
+    "address": "127.0.0.1",
+    "port": "50000",
+    "neighbours": [
+      {
+        "id": "n3",
+        "address": "127.0.0.1",
+        "port": "30000"
       }
     ]
   }
