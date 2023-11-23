@@ -226,6 +226,7 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 			videos = append(videos, req.File)
 			// if the node is a RP it looks directly for the SERVER
 			if nodeType == RP {
+				//TODO: ir diretamente aos servidores
 				for _, neighbour := range node.Neighbours {
 					if neighbour.Server {
 						sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, req)
