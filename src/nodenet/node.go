@@ -243,7 +243,6 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 
 func StartNode(node *Node) {
 	var wg sync.WaitGroup
-	//FIXME: change to 8080
 	socket := SetupSocket("")
 	log.Printf("NODE: Streaming on %s\n", socket.LocalAddr().String())
 
@@ -255,8 +254,7 @@ func StartNode(node *Node) {
 
 func StartServerNode(node *Node, videoFile string) {
 	var wg sync.WaitGroup
-	//FIXME: change to 8080
-	socket := SetupSocket("localhost:8080")
+	socket := SetupSocket(node.Address + ":8080")
 	log.Printf("NODE: Streaming on %s\n", socket.LocalAddr().String())
 	videos = append(videos, videoFile)
 
@@ -268,7 +266,6 @@ func StartServerNode(node *Node, videoFile string) {
 
 func StartRPNode(node *Node) {
 	var wg sync.WaitGroup
-	//FIXME: change to 8080
 	socket := SetupSocket("")
 	log.Printf("RP: Streaming on %s\n", socket.LocalAddr().String())
 
