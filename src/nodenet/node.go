@@ -222,6 +222,10 @@ func isStopRequest(node *Node, pac *Packet, addr net.Addr, streamSocket *net.Pac
 		log.Println("NODE: Stopping streaming to node: " + pac.Source)
 	}
 
+	if sub == nil && pac.State == ABORT {
+		return true
+	}
+
 	// delete subscriber from list
 	err := deleteSubscriber(&subscribers, sub)
 	util.HandleError(err)
@@ -290,11 +294,12 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		// if the incoming request address is not a subscriber
 		if sub == nil {
 			log.Println("NODE: New subscriber: " + pac.Source)
-			sub := Subscriber{
+			newSub := Subscriber{
 				Id:      pac.Source,
 				Address: addr.String(),
 			}
-			subscribers = append(subscribers, sub)
+			subscribers = append(subscribers, newSub)
+			sub = &newSub
 		}
 
 		// if the node does have the requested video
@@ -302,6 +307,7 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 			continue
 		}
 
+		fmt.Println("subscribers: ", subscribers)
 		log.Println("NODE: Video not found. Requesting video: " + pac.File)
 		videos = append(videos, pac.File)
 		// if the node is a RP it looks directly for the SERVER
@@ -315,6 +321,9 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 			}
 		} else {
 			for _, neighbour := range node.Neighbours {
+				if neighbour.Id == sub.Id {
+					continue
+				}
 				pac.Source = node.Id
 				go sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, pac)
 			}
