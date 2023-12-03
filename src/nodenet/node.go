@@ -46,9 +46,13 @@ var videos = []string{}
 
 var publisher = Publisher{}
 
+var subscribersMutex sync.RWMutex
+
 var subscribers = []Subscriber{}
 
 func findSubscriber(id string) *Subscriber {
+	subscribersMutex.RLock()
+	defer subscribersMutex.RUnlock()
 	for _, sub := range subscribers {
 		if sub.Id == id {
 			return &sub
@@ -58,6 +62,8 @@ func findSubscriber(id string) *Subscriber {
 }
 
 func deleteSubscriber(subscribers *[]Subscriber, sub *Subscriber) error {
+	subscribersMutex.Lock()
+	defer subscribersMutex.Unlock()
 	if subscribers == nil {
 		return errors.New("subscribers list is nil")
 	}
@@ -192,6 +198,7 @@ func streamToSubscribers(buffer []byte, socket *net.PacketConn, node *Node) {
 		for _, sub := range subscribers {
 			addr, err := net.ResolveUDPAddr("udp", sub.Address)
 			util.HandleError(err)
+			fmt.Println("NODE: Sending to subscriber: " + sub.Id)
 			_, err = (*socket).WriteTo(buffer, addr)
 			util.HandleError(err)
 		}
@@ -227,6 +234,7 @@ func isStopRequest(node *Node, pac *Packet, addr net.Addr, streamSocket *net.Pac
 	}
 
 	// delete subscriber from list
+
 	err := deleteSubscriber(&subscribers, sub)
 	util.HandleError(err)
 
@@ -293,13 +301,19 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		sub := findSubscriber(pac.Source)
 		// if the incoming request address is not a subscriber
 		if sub == nil {
+			if pac.State == STOP_STREAMING || pac.State == ABORT {
+				continue
+			}
+
 			log.Println("NODE: New subscriber: " + pac.Source)
 			newSub := Subscriber{
 				Id:      pac.Source,
 				Address: addr.String(),
 			}
+			subscribersMutex.Lock()
 			subscribers = append(subscribers, newSub)
 			sub = &newSub
+			subscribersMutex.Unlock()
 		}
 
 		// if the node does have the requested video
