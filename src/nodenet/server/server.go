@@ -34,9 +34,10 @@ func startVideoStreaming(node nodenet.Node, videoFile string) {
 			err := binary.Write(idBuff, binary.LittleEndian, uint64(i))
 			util.HandleError(err)
 			pac := nodenet.Packet{
-				Id:    idBuff.Bytes(),
-				Data:  chunk,
-				State: nodenet.STREAMING,
+				Id:     idBuff.Bytes(),
+				Data:   chunk,
+				Source: node.Id,
+				State:  nodenet.STREAMING,
 			}
 			nodenet.SendPacket(socket, addr, &pac)
 			time.Sleep(2 * time.Millisecond)

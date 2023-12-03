@@ -3,6 +3,7 @@ package nodenet
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -31,11 +32,43 @@ const (
 	SERVER  NodeType = "SERVER"
 )
 
+type Subscriber struct {
+	Id      string
+	Address string
+}
+
+type Publisher struct {
+	Id      string
+	Address string
+}
+
 var videos = []string{}
 
-var subscribers = []string{}
+var publisher = Publisher{}
 
-var publisher = ""
+var subscribers = []Subscriber{}
+
+func findSubscriber(id string) *Subscriber {
+	for _, sub := range subscribers {
+		if sub.Id == id {
+			return &sub
+		}
+	}
+	return nil
+}
+
+func deleteSubscriber(subscribers *[]Subscriber, sub *Subscriber) error {
+	if subscribers == nil {
+		return errors.New("subscribers list is nil")
+	}
+	for i := range *subscribers {
+		if (*subscribers)[i].Id == sub.Id {
+			*subscribers = append((*subscribers)[:i], (*subscribers)[i+1:]...)
+			return nil
+		}
+	}
+	return errors.New("subscriber not found")
+}
 
 func (n *Node) DecodeNode(buff []byte) {
 	// Decode node
@@ -124,80 +157,94 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 	for {
 		buffer = make([]byte, 2024)
 		_, addr := ReadFromSocket(*socket, buffer)
-
+		pac := DecodePacket(buffer)
 		// if the node does not have a publisher yet
-		if publisher == "" {
-			publisher = addr.String()
-			log.Println("NODE: Found a publisher: " + publisher)
+		if publisher.Id == "" {
+			publisher.Id = pac.Source
+			publisher.Address = addr.String()
+			log.Println("NODE: Found a publisher: " + publisher.Id)
 		}
 
 		// if the incoming request address is not a different publisher
-		if addr.String() != publisher {
-			go func() {
-				pac := DecodePacket(buffer)
-				log.Println("NODE: Already streaming from another publisher")
-				pac.State = STOP_STREAMING
-				pac.Source = addr.String()
-				for _, neighbour := range node.Neighbours {
+		if pac.Source != publisher.Id {
+			log.Println("NODE: Already streaming from another publisher")
+			pac.State = STOP_STREAMING
+			for _, neighbour := range node.Neighbours {
+				if neighbour.Id == pac.Source {
+					pac.Source = node.Id
 					sendRequest(*socket, neighbour.Address+":"+neighbour.Port, pac)
+					break
 				}
-			}()
+			}
+			continue
 		}
-		go streamToSubscribers(buffer, socket)
+		pac.Source = node.Id
+		go streamToSubscribers(EncodePacket(pac), socket, node)
 	}
 }
 
-func streamToSubscribers(buffer []byte, socket *net.PacketConn) {
-	for _, subscriber := range subscribers {
-		go func(buff []byte, sub string) {
-			addr, err := net.ResolveUDPAddr("udp", sub)
+func streamToSubscribers(buffer []byte, socket *net.PacketConn, node *Node) {
+	if subscribers == nil {
+		return
+	}
+
+	go func() {
+		for _, sub := range subscribers {
+			addr, err := net.ResolveUDPAddr("udp", sub.Address)
 			util.HandleError(err)
 			_, err = (*socket).WriteTo(buffer, addr)
 			util.HandleError(err)
-		}(buffer, subscriber)
-	}
+		}
+	}()
 }
 
 func isStopRequest(node *Node, pac *Packet, addr net.Addr, streamSocket *net.PacketConn) bool {
 	if pac.State != STOP_STREAMING && pac.State != ABORT {
 		return false
 	}
-	reqAddr, reqPort, err := net.SplitHostPort(pac.Source)
-	util.HandleError(err)
-	streamAddr, streamPort, err := net.SplitHostPort((*streamSocket).LocalAddr().String())
-	util.HandleError(err)
-	fmt.Println("State: " + pac.State)
-	if !util.ContainsString(subscribers, addr.String()) {
+
+	sub := findSubscriber(pac.Source)
+
+	if sub == nil && pac.State == STOP_STREAMING {
 		return false
 	}
 
 	if pac.State == STOP_STREAMING {
-		if reqAddr == streamAddr && reqPort == streamPort {
+		if pac.Source == node.Id {
 			return false
 		}
+		log.Println("NODE: STOP streaming request received")
+		log.Println("NODE: Stopping streaming to node: " + pac.Source)
 	}
 
-	log.Println("NODE: STOP streaming request received")
-	log.Println("NODE: Stopping streaming to node: " + addr.String())
-	subscribers = util.RemoveString(subscribers, addr.String())
+	if pac.State == ABORT {
+		log.Println("NODE: ABORT streaming request received")
+		log.Println("NODE: Stopping streaming to node: " + pac.Source)
+	}
+
+	// delete subscriber from list
+	err := deleteSubscriber(&subscribers, sub)
+	util.HandleError(err)
 
 	if node.Type == SERVER {
 		return true
 	}
-
 	if len(subscribers) == 0 {
 		log.Println("NODE: No more subscribers. Stopping streaming.")
 		videos = []string{}
 
 		pac := Packet{
-			State: STOP_STREAMING,
+			Source: node.Id,
+			State:  STOP_STREAMING,
 		}
-		addr, err := net.ResolveUDPAddr("udp", publisher)
-		util.HandleError(err)
-		log.Printf("NODE: Sending request to %s: %s\n", publisher, pac.State)
-		_, err = (*streamSocket).WriteTo(EncodePacket(&pac), addr)
-		util.HandleError(err)
-		publisher = ""
+
+		for _, neighbour := range node.Neighbours {
+			if neighbour.Id == publisher.Id {
+				sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, &pac)
+				publisher = Publisher{}
+				break
+			}
+		}
 	}
 
 	return true
@@ -220,7 +267,8 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		<-interrupt
 		fmt.Println("\nReceived interrupt signal. Cleaning up...")
 		pac := Packet{
-			State: ABORT,
+			Source: node.Id,
+			State:  ABORT,
 		}
 		for _, neighbour := range node.Neighbours {
 			sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, &pac)
@@ -232,16 +280,21 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		buffer = make([]byte, 2024)
 		_, addr := ReadFromSocket(socket, buffer)
 		pac := DecodePacket(buffer)
-
+		fmt.Println("NODE: Received request from " + pac.Source)
 		// checks for stop streaming requests
 		if isStopRequest(node, pac, addr, streamSocket) {
 			continue
 		}
 
+		sub := findSubscriber(pac.Source)
 		// if the incoming request address is not a subscriber
-		if !util.ContainsString(subscribers, addr.String()) {
-			log.Println("NODE: New subscriber: " + addr.String())
-			subscribers = append(subscribers, addr.String())
+		if sub == nil {
+			log.Println("NODE: New subscriber: " + pac.Source)
+			sub := Subscriber{
+				Id:      pac.Source,
+				Address: addr.String(),
+			}
+			subscribers = append(subscribers, sub)
 		}
 
 		// if the node does have the requested video
@@ -256,11 +309,13 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 			//TODO: ir diretamente aos servidores
 			for _, neighbour := range node.Neighbours {
 				if neighbour.Server {
+					pac.Source = node.Id
 					sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, pac)
 				}
 			}
 		} else {
 			for _, neighbour := range node.Neighbours {
+				pac.Source = node.Id
 				go sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, pac)
 			}
 		}

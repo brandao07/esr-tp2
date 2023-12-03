@@ -40,7 +40,7 @@ func handleReceivedPacket(buff []byte, addr net.Addr, expectedPacketId uint64, v
 // 	}
 // }
 
-func startVideoStreaming(addr, payload string, wg *sync.WaitGroup, videoFile *os.File) {
+func startVideoStreaming(addr, payload string, wg *sync.WaitGroup, videoFile *os.File, clientId string) {
 	socket := nodenet.SetupSocket("")
 	defer socket.Close()
 	defer (*wg).Done()
@@ -49,9 +49,10 @@ func startVideoStreaming(addr, payload string, wg *sync.WaitGroup, videoFile *os
 	var expectedPacketId uint64 = 0
 
 	packet := nodenet.Packet{
-		Id:    []byte("0"),
-		File:  payload,
-		State: nodenet.REQUESTING,
+		Id:     []byte("0"),
+		Source: clientId,
+		File:   payload,
+		State:  nodenet.REQUESTING,
 	}
 
 	sendRequest(socket, addr, &packet)
@@ -63,13 +64,13 @@ func startVideoStreaming(addr, payload string, wg *sync.WaitGroup, videoFile *os
 		<-interrupt
 		fmt.Println("\nReceived interrupt signal. Cleaning up...")
 		pac := nodenet.Packet{
-			State: nodenet.ABORT,
+			State:  nodenet.ABORT,
+			Source: clientId,
 		}
 
 		addr, err := net.ResolveUDPAddr("udp", addr)
 		util.HandleError(err)
 		log.Printf("CLIENT: Sending request to %s: %s\n", addr, pac.State)
-		pac.Source = addr.String()
 		_, err = socket.WriteTo(nodenet.EncodePacket(&pac), addr)
 		util.HandleError(err)
 		os.Exit(0)
@@ -92,12 +93,13 @@ func Run(serverAddr, filename string) {
 	var wg sync.WaitGroup
 	// Create a file to write the incoming video data
 	out := fmt.Sprintf("./out/out-%d.mjpeg", time.Now().UnixNano()/int64(time.Millisecond))
+	clientId := fmt.Sprintf("%d", time.Now().UnixNano()/int64(time.Millisecond))
 	videoFile, err := os.Create(out)
 	util.HandleError(err)
 	defer videoFile.Close()
 
 	wg.Add(1)
-	go startVideoStreaming(serverAddr, filename, &wg, videoFile)
+	go startVideoStreaming(serverAddr, filename, &wg, videoFile, clientId)
 	// $ vlc --no-one-instance out
 	// Start playing the video file with VLC after a delay
 	time.Sleep(1 * time.Second)
