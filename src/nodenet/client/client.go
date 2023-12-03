@@ -65,7 +65,13 @@ func startVideoStreaming(addr, payload string, wg *sync.WaitGroup, videoFile *os
 		pac := nodenet.Packet{
 			State: nodenet.ABORT,
 		}
-		sendRequest(socket, addr, &pac)
+
+		addr, err := net.ResolveUDPAddr("udp", addr)
+		util.HandleError(err)
+		log.Printf("CLIENT: Sending request to %s: %s\n", addr, pac.State)
+		pac.Source = addr.String()
+		_, err = socket.WriteTo(nodenet.EncodePacket(&pac), addr)
+		util.HandleError(err)
 		os.Exit(0)
 	}()
 
