@@ -4,13 +4,13 @@ BUILD_FLAGS = -o ./cmd/$(BINARY_NAME)
 
 # Build the executable
 build:
-	
 	@go fmt ./...
 	@echo "Building $(BINARY_NAME)..."
 	@go build $(BUILD_FLAGS) ./src
 
 # Run the application with arguments
 run:
+	@clear
 	@mkdir -p ./out
 	@echo "Running $(BINARY_NAME) with arguments: $(ARGS)...\n"
 	@./cmd/$(BINARY_NAME) $(ARGS)
