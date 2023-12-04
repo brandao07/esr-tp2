@@ -25,8 +25,12 @@ func sendRequest(socket net.PacketConn, serverAddr string, pac *nodenet.Packet) 
 
 func handleReceivedPacket(buff []byte, addr net.Addr, expectedPacketId uint64, videoFile *os.File) {
 	pac := nodenet.DecodePacket(buff)
+	//start := time.Now()
 	// Write received data to the video file
 	_, err := videoFile.Write(pac.Data[:len(pac.Data)])
+	//finish := time.Now()
+	//log.Printf("CLIENT: Received packet %d from %s. Elapsed time: %s\n", expectedPacketId, addr, finish.Sub(start))
+
 	util.HandleError(err)
 }
 

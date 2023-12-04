@@ -16,7 +16,7 @@ func startVideoStreaming(node nodenet.Node, videoFile string) {
 	socket := nodenet.SetupSocket("")
 	defer socket.Close()
 
-	addr, err := net.ResolveUDPAddr("udp", node.Address+":8080")
+	addr, err := net.ResolveUDPAddr("udp", node.Address+":"+node.ServerPort)
 	util.HandleError(err)
 	videoData, err := os.ReadFile(videoFile)
 	util.HandleError(err)
@@ -34,10 +34,11 @@ func startVideoStreaming(node nodenet.Node, videoFile string) {
 			err := binary.Write(idBuff, binary.LittleEndian, uint64(i))
 			util.HandleError(err)
 			pac := nodenet.Packet{
-				Id:     idBuff.Bytes(),
-				Data:   chunk,
-				Source: node.Id,
-				State:  nodenet.STREAMING,
+				Id:        idBuff.Bytes(),
+				Data:      chunk,
+				Source:    node.Id,
+				State:     nodenet.STREAMING,
+				Timestamp: time.Now(),
 			}
 			nodenet.SendPacket(socket, addr, &pac)
 			time.Sleep(2 * time.Millisecond)

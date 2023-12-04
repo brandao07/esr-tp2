@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/brandao07/esr-tp2/src/util"
 )
@@ -19,7 +20,8 @@ type Node struct {
 	Id         string `json:"id"`
 	Address    string `json:"address"`
 	Port       string `json:"port"`
-	Server     bool   `json:"server"`
+	ServerPort string `json:"serverPort"`
+	IsRP       bool   `json:"isRP"`
 	Neighbours []Node `json:"neighbours"`
 	Type       NodeType
 }
@@ -42,7 +44,15 @@ type Publisher struct {
 	Address string
 }
 
+type Server struct {
+	Id      string
+	Address string
+	Latency float64
+}
+
 var videos = []string{}
+
+var servers = []Server{}
 
 var publisher = Publisher{}
 
@@ -198,7 +208,6 @@ func streamToSubscribers(buffer []byte, socket *net.PacketConn, node *Node) {
 		for _, sub := range subscribers {
 			addr, err := net.ResolveUDPAddr("udp", sub.Address)
 			util.HandleError(err)
-			fmt.Println("NODE: Sending to subscriber: " + sub.Id)
 			_, err = (*socket).WriteTo(buffer, addr)
 			util.HandleError(err)
 		}
@@ -234,7 +243,6 @@ func isStopRequest(node *Node, pac *Packet, addr net.Addr, streamSocket *net.Pac
 	}
 
 	// delete subscriber from list
-
 	err := deleteSubscriber(&subscribers, sub)
 	util.HandleError(err)
 
@@ -262,10 +270,30 @@ func isStopRequest(node *Node, pac *Packet, addr net.Addr, streamSocket *net.Pac
 	return true
 }
 
+func handleNewServer(node *Node, pac *Packet, addr net.Addr, streamSocket *net.PacketConn) error {
+	if node.Type != RP {
+		return errors.New("node is not a RP")
+	}
+	rpTimestamp := time.Now()
+	latency := rpTimestamp.Sub(pac.Timestamp).Seconds()
+	server := Server{
+		Id:      pac.Source,
+		Address: addr.String(),
+		Latency: latency,
+	}
+	log.Println("RP: New Server detected: " + server.Id + " With latency: " + fmt.Sprintf("%f", server.Latency) + "s")
+	servers = append(servers, server)
+	return nil
+}
+
 func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.PacketConn) {
 	nodeAddr := node.Address + ":" + node.Port
 	socket := SetupSocket(nodeAddr)
 	log.Printf("NODE: Listening on %s\n", socket.LocalAddr().String())
+
+	if node.Type == SERVER {
+		go notifyRP(wg, node, &socket)
+	}
 
 	defer socket.Close()
 	defer (*wg).Done()
@@ -292,6 +320,12 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		buffer = make([]byte, 2024)
 		_, addr := ReadFromSocket(socket, buffer)
 		pac := DecodePacket(buffer)
+
+		if pac.State == SERVER_INFO {
+			err := handleNewServer(node, pac, addr, streamSocket)
+			util.HandleError(err)
+			continue
+		}
 		fmt.Println("NODE: Received request from " + pac.Source)
 		// checks for stop streaming requests
 		if isStopRequest(node, pac, addr, streamSocket) {
@@ -326,12 +360,13 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		videos = append(videos, pac.File)
 		// if the node is a RP it looks directly for the SERVER
 		if node.Type == RP {
-			//TODO: ir diretamente aos servidores
-			for _, neighbour := range node.Neighbours {
-				if neighbour.Server {
-					pac.Source = node.Id
-					sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, pac)
-				}
+			if len(servers) == 0 {
+				log.Println("RP: No servers found. Waiting for servers to connect...")
+				continue
+			}
+			for _, server := range servers {
+				pac.Source = node.Id
+				sendRequest(*streamSocket, server.Address, pac)
 			}
 		} else {
 			for _, neighbour := range node.Neighbours {
@@ -341,6 +376,24 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 				pac.Source = node.Id
 				go sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, pac)
 			}
+		}
+	}
+}
+
+func notifyRP(wg *sync.WaitGroup, node *Node, streamSocket *net.PacketConn) {
+	defer (*wg).Done()
+	if node.Type != SERVER {
+		return
+	}
+	pac := Packet{
+		Source:    node.Id,
+		State:     SERVER_INFO,
+		Timestamp: time.Now(),
+	}
+	for _, neighbour := range node.Neighbours {
+		if neighbour.IsRP {
+			log.Println("SERVER: Notifying RP: " + neighbour.Id)
+			sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, &pac)
 		}
 	}
 }
@@ -360,7 +413,7 @@ func StartNode(node *Node) {
 
 func StartServerNode(node *Node, videoFile string) {
 	var wg sync.WaitGroup
-	socket := SetupSocket(node.Address + ":8080")
+	socket := SetupSocket(node.Address + ":" + node.ServerPort)
 	log.Printf("NODE: Streaming on %s\n", socket.LocalAddr().String())
 	videos = append(videos, videoFile)
 
@@ -376,7 +429,7 @@ func StartRPNode(node *Node) {
 	var wg sync.WaitGroup
 	socket := SetupSocket("")
 	log.Printf("RP: Streaming on %s\n", socket.LocalAddr().String())
-
+	log.Println("RP: Waiting for servers to connect...")
 	node.Type = RP
 
 	wg.Add(2)

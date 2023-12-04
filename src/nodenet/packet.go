@@ -16,18 +16,17 @@ const (
 	STREAMING      PacketState = "STREAMING"
 	REQUESTING     PacketState = "REQUESTING"
 	STOP_STREAMING PacketState = "STOP_STREAMING"
+	SERVER_INFO    PacketState = "SERVER_INFO"
 	ABORT          PacketState = "ABORT"
 )
 
 type Packet struct {
-	Id          []byte
-	Data        []byte
-	State       PacketState
-	File        string
-	Source      string
-	Destination string
-	Path        []string
-	Timestamp   time.Time
+	Id        []byte
+	Data      []byte
+	State     PacketState
+	File      string
+	Source    string
+	Timestamp time.Time
 }
 
 func DecodePacket(buff []byte) *Packet {
