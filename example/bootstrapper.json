@@ -20,10 +20,12 @@
     "id": "n2",
     "address": "127.0.0.1",
     "port": "20000",
+    "serverPort": "20001",
     "neighbours": [
       {
         "n1": "n3",
         "address": "127.0.0.1",
+        "isRP": true,
         "port": "30000"
       }
     ]
@@ -35,7 +37,6 @@
     "neighbours": [
       {
         "id": "n2",
-        "server": true,
         "address": "127.0.0.1",
         "port": "20000"
       },
@@ -82,6 +83,20 @@
         "id": "n3",
         "address": "127.0.0.1",
         "port": "30000"
+      }
+    ]
+  },
+  {
+    "id": "n6",
+    "address": "127.0.0.1",
+    "serverPort": "60001",
+    "port": "60000",
+    "neighbours": [
+      {
+        "id": "n3",
+        "address": "127.0.0.1",
+        "port": "30000",
+        "isRP": true
       }
     ]
   }
