@@ -16,8 +16,10 @@ const (
 	STREAMING      PacketState = "STREAMING"
 	REQUESTING     PacketState = "REQUESTING"
 	STOP_STREAMING PacketState = "STOP_STREAMING"
-	SERVER_INFO    PacketState = "SERVER_INFO"
+	NEW_SERVER     PacketState = "SERVER_INFO"
 	ABORT          PacketState = "ABORT"
+	CHECK_SERVER   PacketState = "CHECK_SERVER"
+	SERVER_INFO    PacketState = "SERVER_INFO"
 )
 
 type Packet struct {

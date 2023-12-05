@@ -45,9 +45,10 @@ type Publisher struct {
 }
 
 type Server struct {
-	Id      string
-	Address string
-	Latency float64
+	Id          string
+	Address     string
+	Latency     float64
+	isPublisher bool
 }
 
 var videos = []string{}
@@ -173,31 +174,36 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 	for {
 		buffer = make([]byte, 2024)
 		_, addr := ReadFromSocket(*socket, buffer)
-		go func(buffer []byte, addr net.Addr) {
-			pac := DecodePacket(buffer)
-			// if the node does not have a publisher yet
-			if publisher.Id == "" {
-				publisher.Id = pac.Source
-				publisher.Address = addr.String()
-				log.Println("NODE: Found a publisher: " + publisher.Id)
-			}
-
-			// if the incoming request address is not a different publisher
-			if pac.Source != publisher.Id {
-				log.Println("NODE: Already streaming from another publisher")
-				pac.State = STOP_STREAMING
-				for _, neighbour := range node.Neighbours {
-					if neighbour.Id == pac.Source {
-						pac.Source = node.Id
-						sendRequest(*socket, neighbour.Address+":"+neighbour.Port, pac)
-						break
+		pac := DecodePacket(buffer)
+		// if the node does not have a publisher yet
+		if publisher.Id == "" {
+			if node.Type == RP {
+				for _, server := range servers {
+					if server.Id == pac.Source {
+						server.isPublisher = true
 					}
 				}
-				return
 			}
-			pac.Source = node.Id
-			streamToSubscribers(EncodePacket(pac), socket, node)
-		}(buffer, addr)
+			publisher.Id = pac.Source
+			publisher.Address = addr.String()
+			log.Println("NODE: Found a publisher: " + publisher.Id)
+		}
+
+		// if the incoming request address is not a different publisher
+		if pac.Source != publisher.Id {
+			log.Println("NODE: Already streaming from another publisher")
+			pac.State = STOP_STREAMING
+			for _, neighbour := range node.Neighbours {
+				if neighbour.Id == pac.Source {
+					pac.Source = node.Id
+					sendRequest(*socket, neighbour.Address+":"+neighbour.Port, pac)
+					break
+				}
+			}
+			continue
+		}
+		pac.Source = node.Id
+		go streamToSubscribers(EncodePacket(pac), socket, node)
 	}
 }
 
@@ -272,20 +278,83 @@ func isStopRequest(node *Node, pac *Packet, addr net.Addr, streamSocket *net.Pac
 	return true
 }
 
-func handleNewServer(node *Node, pac *Packet, addr net.Addr, streamSocket *net.PacketConn) error {
+func handleNewServer(node *Node, pac *Packet, addr net.Addr) error {
 	if node.Type != RP {
 		return errors.New("node is not a RP")
 	}
 	rpTimestamp := time.Now()
 	latency := rpTimestamp.Sub(pac.Timestamp).Seconds()
 	server := Server{
-		Id:      pac.Source,
-		Address: addr.String(),
-		Latency: latency,
+		Id:          pac.Source,
+		Address:     addr.String(),
+		Latency:     latency,
+		isPublisher: false,
 	}
 	log.Println("RP: New Server detected: " + server.Id + " With latency: " + fmt.Sprintf("%f", server.Latency) + "s")
 	servers = append(servers, server)
 	return nil
+}
+
+func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn) {
+	socket := SetupSocket("")
+
+	defer socket.Close()
+	defer (*wg).Done()
+
+	pac := Packet{
+		Source: node.Id,
+		State:  CHECK_SERVER,
+	}
+	buffer := make([]byte, 2024)
+
+	for {
+		time.Sleep(5 * time.Second)
+		if len(servers) <= 1 {
+			continue
+		}
+		log.Println("RP: Checking servers latencies...")
+		var currentPublisher Server
+		for _, server := range servers {
+			if server.isPublisher {
+				currentPublisher = server
+			}
+			sendRequest(socket, server.Address, &pac)
+			_, _ = ReadFromSocket(socket, buffer)
+			pac := DecodePacket(buffer)
+			if pac.State != SERVER_INFO {
+				continue
+			}
+			server.Latency = time.Since(pac.Timestamp).Seconds()
+			log.Println("RP: Server " + server.Id + " latency: " + fmt.Sprintf("%f", server.Latency) + "s")
+		}
+		// compare latencies
+		var bestServer Server
+		for _, server := range servers {
+			if bestServer.Id == "" {
+				bestServer = server
+				continue
+			}
+			if server.Latency < bestServer.Latency {
+				bestServer = server
+			}
+		}
+
+		//  check if bestServer is 500% better than the server that is currently streaming
+		if bestServer.Id != "" && currentPublisher.Id != "" && bestServer.Latency < currentPublisher.Latency/5 {
+			log.Println("RP: Switching to server: " + bestServer.Id)
+			pac := Packet{
+				Source: node.Id,
+				State:  STOP_STREAMING,
+			}
+			sendRequest(*requestSocket, currentPublisher.Address, &pac)
+			// wait for the server to stop streaming
+			time.Sleep(2 * time.Second)
+			publisher = Publisher{}
+			pac.State = REQUESTING
+			pac.File = videos[0]
+			sendRequest(*requestSocket, bestServer.Address, &pac)
+		}
+	}
 }
 
 func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.PacketConn) {
@@ -295,6 +364,11 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 
 	if node.Type == SERVER {
 		go notifyRP(wg, node, &socket)
+	}
+
+	if node.Type == RP {
+		wg.Add(1)
+		go checkServers(node, wg, &socket)
 	}
 
 	defer socket.Close()
@@ -322,9 +396,15 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 		buffer = make([]byte, 2024)
 		_, addr := ReadFromSocket(socket, buffer)
 		pac := DecodePacket(buffer)
-
-		if pac.State == SERVER_INFO {
-			err := handleNewServer(node, pac, addr, streamSocket)
+		if pac.State == CHECK_SERVER {
+			pac.Source = node.Id
+			pac.State = SERVER_INFO
+			pac.Timestamp = time.Now()
+			sendRequest(socket, addr.String(), pac)
+			continue
+		}
+		if pac.State == NEW_SERVER {
+			err := handleNewServer(node, pac, addr)
 			util.HandleError(err)
 			continue
 		}
@@ -382,20 +462,21 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 	}
 }
 
-func notifyRP(wg *sync.WaitGroup, node *Node, streamSocket *net.PacketConn) {
+// Sends a notification to RP that a new server has been detected
+func notifyRP(wg *sync.WaitGroup, node *Node, socket *net.PacketConn) {
 	defer (*wg).Done()
 	if node.Type != SERVER {
 		return
 	}
 	pac := Packet{
 		Source:    node.Id,
-		State:     SERVER_INFO,
+		State:     NEW_SERVER,
 		Timestamp: time.Now(),
 	}
 	for _, neighbour := range node.Neighbours {
 		if neighbour.IsRP {
 			log.Println("SERVER: Notifying RP: " + neighbour.Id)
-			sendRequest(*streamSocket, neighbour.Address+":"+neighbour.Port, &pac)
+			sendRequest(*socket, neighbour.Address+":"+neighbour.Port, &pac)
 		}
 	}
 }
