@@ -179,7 +179,7 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 		_, addr := ReadFromSocket(*socket, buffer)
 		pac := DecodePacket(buffer)
 		// if the node does not have a publisher yet
-		if publisher.Id == "" || switchingServers {
+		if publisher.Id == "" || pac.Source != publisher.Id && switchingServers {
 			if lastServer == pac.Source {
 				continue
 			}
@@ -189,7 +189,6 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 						servers[i].isPublisher = true
 					}
 				}
-				fmt.Println("servers: ", servers)
 			}
 			lastServer = pac.Source
 			publisher.Id = pac.Source
@@ -200,12 +199,16 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 
 		// if the incoming request address is not a different publisher
 		if pac.Source != publisher.Id {
-			log.Println("NODE: Already streaming from another publisher")
-			pac.State = STOP_STREAMING
+			log.Println("NODE: Packet received from another publisher (" + pac.Source + ")")
+			log.Println("NODE: Already streaming from another publisher (" + publisher.Id + ")")
+
 			for _, neighbour := range node.Neighbours {
 				if neighbour.Id == pac.Source {
-					pac.Source = node.Id
-					sendRequest(*socket, neighbour.Address+":"+neighbour.Port, pac)
+					pac := Packet{
+						Source: node.Id,
+						State:  STOP_STREAMING,
+					}
+					sendRequest(*socket, neighbour.Address+":"+neighbour.Port, &pac)
 					break
 				}
 			}
@@ -262,6 +265,7 @@ func isStopRequest(node *Node, pac *Packet, addr net.Addr, streamSocket *net.Pac
 	// delete subscriber from list
 	err := deleteSubscriber(&subscribers, sub)
 	util.HandleError(err)
+	log.Println("NODE: Subscriber " + sub.Id + " disconnected")
 
 	if node.Type == SERVER {
 		return true
@@ -300,11 +304,12 @@ func handleNewServer(node *Node, pac *Packet, addr net.Addr) error {
 		isPublisher: false,
 	}
 	log.Println("RP: New Server detected: " + server.Id + " With latency: " + fmt.Sprintf("%f", server.Latency) + "s")
+	log.Println(server.Address)
 	servers = append(servers, server)
 	return nil
 }
 
-func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn) {
+func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn, streamSocket *net.PacketConn) {
 	socket := SetupSocket("")
 
 	defer socket.Close()
@@ -339,6 +344,7 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 				currentPublisher = server
 			}
 		}
+
 		// compare latencies
 		var bestServer *Server
 
@@ -348,25 +354,28 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 			}
 		}
 
-		fmt.Println("RP: Current Publisher:", currentPublisher)
-		fmt.Println("RP: Best Server:", bestServer)
 		if bestServer == nil || currentPublisher.Id == "" {
 			continue
 		}
+
 		// check if the best server is 5x better than the current publisher
 		if currentPublisher.Latency/5 >= bestServer.Latency {
+			if currentPublisher.Id == bestServer.Id {
+				log.Println("RP: Already streaming from best server: " + bestServer.Id)
+				continue
+			}
 			log.Println("RP: Switching to server: " + bestServer.Id)
 			pac := Packet{
 				Source: node.Id,
 				State:  STOP_STREAMING,
 			}
 			sendRequest(*requestSocket, currentPublisher.Address, &pac)
-			// wait for the server to stop streaming
-			publisher = Publisher{}
+			publisher.Id = ""
+			publisher.Address = ""
 			pac.State = REQUESTING
 			pac.File = videos[0]
 			switchingServers = true
-			sendRequest(*requestSocket, bestServer.Address, &pac)
+			sendRequest(*streamSocket, bestServer.Address, &pac)
 		} else {
 			log.Println("RP: Staying with current publisher: " + currentPublisher.Id)
 		}
@@ -384,7 +393,7 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 
 	if node.Type == RP {
 		wg.Add(1)
-		go checkServers(node, wg, &socket)
+		go checkServers(node, wg, &socket, streamSocket)
 	}
 
 	defer socket.Close()
@@ -424,7 +433,7 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 			util.HandleError(err)
 			continue
 		}
-		fmt.Println("NODE: Received request from " + pac.Source)
+		//fmt.Println("NODE: Received request from " + pac.Source)
 		// checks for stop streaming requests
 		if isStopRequest(node, pac, addr, streamSocket) {
 			continue
@@ -448,12 +457,14 @@ func streamingRequestHandler(wg *sync.WaitGroup, node *Node, streamSocket *net.P
 			subscribersMutex.Unlock()
 		}
 
+		if node.Type == SERVER {
+			continue
+		}
+
 		// if the node does have the requested video
 		if util.ContainsString(videos, pac.File) {
 			continue
 		}
-
-		fmt.Println("subscribers: ", subscribers)
 		log.Println("NODE: Video not found. Requesting video: " + pac.File)
 		videos = append(videos, pac.File)
 		// if the node is a RP it looks directly for the SERVER

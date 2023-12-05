@@ -23,7 +23,7 @@
     "serverPort": "8081",
     "neighbours": [
       {
-        "n1": "n3",
+        "id": "n3",
         "isRP": true,
         "address": "10.0.0.2",
         "port": "8000"
