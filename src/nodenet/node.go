@@ -179,10 +179,7 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 		_, addr := ReadFromSocket(*socket, buffer)
 		pac := DecodePacket(buffer)
 		// if the node does not have a publisher yet
-		if publisher.Id == "" || pac.Source != publisher.Id && switchingServers {
-			if lastServer == pac.Source {
-				continue
-			}
+		if publisher.Id == "" || switchingServers && pac.Source != lastServer {
 			if node.Type == RP {
 				for i := range servers {
 					if servers[i].Id == pac.Source {
@@ -360,10 +357,6 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn,
 
 		// check if the best server is 5x better than the current publisher
 		if currentPublisher.Latency/5 >= bestServer.Latency {
-			if currentPublisher.Id == bestServer.Id {
-				log.Println("RP: Already streaming from best server: " + bestServer.Id)
-				continue
-			}
 			log.Println("RP: Switching to server: " + bestServer.Id)
 			pac := Packet{
 				Source: node.Id,
