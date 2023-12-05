@@ -359,6 +359,8 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 			pac.State = REQUESTING
 			pac.File = videos[0]
 			sendRequest(*requestSocket, bestServer.Address, &pac)
+		} else {
+			log.Println("RP: Staying with current publisher: " + currentPublisher.Id)
 		}		
 	}
 }
