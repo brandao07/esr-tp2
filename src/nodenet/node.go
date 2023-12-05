@@ -333,6 +333,7 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn,
 			_, _ = ReadFromSocket(socket, buffer)
 			pac := DecodePacket(buffer)
 			if pac.State != SERVER_INFO {
+				time.Sleep(5 * time.Second)
 				continue
 			}
 			servers[i].Latency = time.Since(pac.Timestamp).Seconds()
@@ -352,10 +353,12 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn,
 		}
 
 		if bestServer == nil || currentPublisher.Id == "" {
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
 		if bestServer.Id == currentPublisher.Id {
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
@@ -376,6 +379,7 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn,
 		} else {
 			log.Println("RP: Staying with current publisher: " + currentPublisher.Id)
 		}
+		time.Sleep(5 * time.Second)
 	}
 }
 
