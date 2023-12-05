@@ -301,14 +301,17 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 	defer socket.Close()
 	defer (*wg).Done()
 
-	pac := Packet{
-		Source: node.Id,
-		State:  CHECK_SERVER,
-	}
 	buffer := make([]byte, 2024)
 
 	for {
 		time.Sleep(5 * time.Second)
+		if publisher.Id == "" {
+			continue
+		}
+		pac := Packet{
+			Source: node.Id,
+			State:  CHECK_SERVER,
+		}
 		if len(servers) <= 1 {
 			continue
 		}
