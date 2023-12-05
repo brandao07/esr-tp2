@@ -328,14 +328,14 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn,
 		}
 		log.Println("RP: Checking servers latencies...")
 		var currentPublisher Server
-		for _, server := range servers {
+		for i, server := range servers {
 			sendRequest(socket, server.Address, &pac)
 			_, _ = ReadFromSocket(socket, buffer)
 			pac := DecodePacket(buffer)
 			if pac.State != SERVER_INFO {
 				continue
 			}
-			server.Latency = time.Since(pac.Timestamp).Seconds()
+			servers[i].Latency = time.Since(pac.Timestamp).Seconds()
 			log.Println("RP: Server " + server.Id + " latency: " + fmt.Sprintf("%f", server.Latency) + "s")
 			if server.isPublisher {
 				currentPublisher = server
