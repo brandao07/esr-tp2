@@ -320,8 +320,8 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 		var currentPublisher Server
 		for _, server := range servers {
 			if server.isPublisher {
-				fmt.Println("im here")
 				currentPublisher = server
+				log.Println("RP: Current publisher: " + currentPublisher.Id)
 			}
 			sendRequest(socket, server.Address, &pac)
 			_, _ = ReadFromSocket(socket, buffer)
@@ -333,19 +333,18 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 			log.Println("RP: Server " + server.Id + " latency: " + fmt.Sprintf("%f", server.Latency) + "s")
 		}
 		// compare latencies
-		var bestServer Server
-		for _, server := range servers {
-			if bestServer.Id == "" {
-				bestServer = server
-				continue
-			}
-			if server.Latency < bestServer.Latency {
-				bestServer = server
+		var bestServer *Server
+
+		for i, server := range servers {
+			if i == 0 || server.Latency < bestServer.Latency {
+				bestServer = &servers[i]
 			}
 		}
 
-		log.Println("RP: Best server: " + bestServer.Id)
-		log.Println("RP: Current publisher: " + currentPublisher.Id)
+		if bestServer != nil {
+			fmt.Println("RP: Best Server:", bestServer.Id)
+		}
+
 		//  check if bestServer is 500% better than the server that is currently streaming
 		if bestServer.Id != "" && currentPublisher.Id != "" && bestServer.Latency < currentPublisher.Latency/5 {
 			log.Println("RP: Switching to server: " + bestServer.Id)
