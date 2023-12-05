@@ -316,10 +316,10 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 			continue
 		}
 		log.Println("RP: Checking servers latencies...")
-		var currentPublisher Server
+		var currentPublisher *Server
 		for _, server := range servers {
 			if server.isPublisher {
-				currentPublisher = server
+				currentPublisher = &server
 			}
 			sendRequest(socket, server.Address, &pac)
 			_, _ = ReadFromSocket(socket, buffer)
@@ -331,17 +331,17 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 			log.Println("RP: Server " + server.Id + " latency: " + fmt.Sprintf("%f", server.Latency) + "s")
 		}
 		// compare latencies
-		var bestServer Server
+		var bestServer *Server
 		for _, server := range servers {
 			if bestServer.Id == "" {
-				bestServer = server
+				bestServer = &server
 				continue
 			}
 			if server.Latency < bestServer.Latency {
-				bestServer = server
+				bestServer = &server
 			}
 		}
-		
+
 		log.Println("RP: Current publisher: " + currentPublisher.Id)
 		//  check if bestServer is 500% better than the server that is currently streaming
 		if bestServer.Id != "" && currentPublisher.Id != "" && bestServer.Latency < currentPublisher.Latency/5 {
