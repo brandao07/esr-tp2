@@ -51,6 +51,9 @@ type Server struct {
 	isPublisher bool
 }
 
+var switchingServers = false
+var lastServer = ""
+
 var videos = []string{}
 
 var servers = []Server{}
@@ -176,7 +179,10 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 		_, addr := ReadFromSocket(*socket, buffer)
 		pac := DecodePacket(buffer)
 		// if the node does not have a publisher yet
-		if publisher.Id == "" {
+		if publisher.Id == "" || switchingServers {
+			if lastServer == pac.Source {
+				continue
+			}
 			if node.Type == RP {
 				for i := range servers {
 					if servers[i].Id == pac.Source {
@@ -185,8 +191,10 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 				}
 				fmt.Println("servers: ", servers)
 			}
+			lastServer = pac.Source
 			publisher.Id = pac.Source
 			publisher.Address = addr.String()
+			switchingServers = false
 			log.Println("NODE: Found a publisher: " + publisher.Id)
 		}
 
@@ -319,9 +327,6 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 		log.Println("RP: Checking servers latencies...")
 		var currentPublisher Server
 		for _, server := range servers {
-			if server.isPublisher {
-				currentPublisher = server
-			}
 			sendRequest(socket, server.Address, &pac)
 			_, _ = ReadFromSocket(socket, buffer)
 			pac := DecodePacket(buffer)
@@ -330,6 +335,9 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 			}
 			server.Latency = time.Since(pac.Timestamp).Seconds()
 			log.Println("RP: Server " + server.Id + " latency: " + fmt.Sprintf("%f", server.Latency) + "s")
+			if server.isPublisher {
+				currentPublisher = server
+			}
 		}
 		// compare latencies
 		var bestServer *Server
@@ -354,14 +362,14 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 			}
 			sendRequest(*requestSocket, currentPublisher.Address, &pac)
 			// wait for the server to stop streaming
-			time.Sleep(2 * time.Second)
 			publisher = Publisher{}
 			pac.State = REQUESTING
 			pac.File = videos[0]
+			switchingServers = true
 			sendRequest(*requestSocket, bestServer.Address, &pac)
 		} else {
 			log.Println("RP: Staying with current publisher: " + currentPublisher.Id)
-		}		
+		}
 	}
 }
 
