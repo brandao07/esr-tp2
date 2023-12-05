@@ -178,9 +178,9 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 		// if the node does not have a publisher yet
 		if publisher.Id == "" {
 			if node.Type == RP {
-				for _, server := range servers {
-					if server.Id == pac.Source {
-						server.isPublisher = true
+				for i := range servers {
+					if servers[i].Id == pac.Source {
+						servers[i].isPublisher = true
 					}
 				}
 				fmt.Println("servers: ", servers)
