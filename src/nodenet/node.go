@@ -165,7 +165,7 @@ func GetNode(bootAddr, id string) *Node {
 func sendRequest(socket net.PacketConn, serverAddr string, pac *Packet) {
 	addr, err := net.ResolveUDPAddr("udp", serverAddr)
 	util.HandleError(err)
-	log.Printf("NODE: Sending request to %s: %s\n", serverAddr, pac.State)
+	//log.Printf("NODE: Sending request to %s: %s\n", serverAddr, pac.State)
 	_, err = socket.WriteTo(EncodePacket(pac), addr)
 	util.HandleError(err)
 }
@@ -358,7 +358,6 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn,
 		if bestServer.Id == currentPublisher.Id {
 			continue
 		}
-		
 
 		// check if the best server is 5x better than the current publisher
 		if currentPublisher.Latency/5 >= bestServer.Latency {
