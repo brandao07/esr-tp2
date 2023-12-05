@@ -173,29 +173,31 @@ func startVideoStreaming(wg *sync.WaitGroup, socket *net.PacketConn, node *Node)
 	for {
 		buffer = make([]byte, 2024)
 		_, addr := ReadFromSocket(*socket, buffer)
-		pac := DecodePacket(buffer)
-		// if the node does not have a publisher yet
-		if publisher.Id == "" {
-			publisher.Id = pac.Source
-			publisher.Address = addr.String()
-			log.Println("NODE: Found a publisher: " + publisher.Id)
-		}
-
-		// if the incoming request address is not a different publisher
-		if pac.Source != publisher.Id {
-			log.Println("NODE: Already streaming from another publisher")
-			pac.State = STOP_STREAMING
-			for _, neighbour := range node.Neighbours {
-				if neighbour.Id == pac.Source {
-					pac.Source = node.Id
-					sendRequest(*socket, neighbour.Address+":"+neighbour.Port, pac)
-					break
-				}
+		go func(buffer []byte, addr net.Addr) {
+			pac := DecodePacket(buffer)
+			// if the node does not have a publisher yet
+			if publisher.Id == "" {
+				publisher.Id = pac.Source
+				publisher.Address = addr.String()
+				log.Println("NODE: Found a publisher: " + publisher.Id)
 			}
-			continue
-		}
-		pac.Source = node.Id
-		go streamToSubscribers(EncodePacket(pac), socket, node)
+
+			// if the incoming request address is not a different publisher
+			if pac.Source != publisher.Id {
+				log.Println("NODE: Already streaming from another publisher")
+				pac.State = STOP_STREAMING
+				for _, neighbour := range node.Neighbours {
+					if neighbour.Id == pac.Source {
+						pac.Source = node.Id
+						sendRequest(*socket, neighbour.Address+":"+neighbour.Port, pac)
+						break
+					}
+				}
+				return
+			}
+			pac.Source = node.Id
+			streamToSubscribers(EncodePacket(pac), socket, node)
+		}(buffer, addr)
 	}
 }
 

@@ -1,34 +1,108 @@
-{
-  "label": "n4",
-  "type": "Node",
-  "interface eth": [
-    {
-      "address": "10.0.19.20",
-      "port": "10000",
-      "type": "Node",
-      "neighbour_address": "10.0.4.1",
-      "neighbour_port": "10000"
-    },
-    {
-      "address": "10.0.6.1",
-      "port": "10000",
-      "type": "Node",
-      "neighbour_address": "10.0.6.2",
-      "neighbour_port": "10000"
-    },
-    {
-      "address": "10.0.7.1",
-      "port": "10000",
-      "type": "Node",
-      "neighbour_address": "10.0.7.2",
-      "neighbour_port": "10000"
-    },
-    {
-      "address": "10.0.1.2",
-      "port": "10000",
-      "type": "Node",
-      "neighbour_address": "10.0.1.1",
-      "neighbour_port": "10000"
-    }
-  ]
-}
+[
+  {
+    "id": "n1",
+    "address": "10.0.0.1",
+    "port": "8000",
+    "neighbours": [
+      {
+        "id": "n3",
+        "address": "10.0.0.2",
+        "port": "8000"
+      },
+      {
+        "id": "n4",
+        "address": "10.0.5.1",
+        "port": "8000"
+      }
+    ]
+  },
+  {
+    "id": "n2",
+    "address": "10.0.1.2",
+    "port": "8000",
+    "serverPort": "8081",
+    "neighbours": [
+      {
+        "n1": "n3",
+        "isRP": true,
+        "address": "10.0.0.2",
+        "port": "8000"
+      }
+    ]
+  },
+  {
+    "id": "n3",
+    "address": "10.0.0.2",
+    "port": "8000",
+    "neighbours": [
+      {
+        "id": "n2",
+        "address": "10.0.1.2",
+        "port": "8000"
+      },
+      {
+        "id": "n1",
+        "address": "10.0.0.1",
+        "port": "8000"
+      },
+      {
+        "id": "n5",
+        "address": "10.0.6.1",
+        "port": "8000"
+      },
+      {
+        "id": "n4",
+        "address": "10.0.5.1",
+        "port": "8000"
+      },
+      {
+        "id": "n11",
+        "address": "10.0.8.1",
+        "port": "8000"
+      }
+    ]
+  },
+  {
+    "id": "n11",
+    "address": "10.0.8.1",
+    "port": "8000",
+    "serverPort": "8081",
+    "neighbours": [
+      {
+        "n1": "n3",
+        "isRP": true,
+        "address": "10.0.0.2",
+        "port": "8000"
+      }
+    ]
+  },
+  {
+    "id": "n4",
+    "address": "10.0.5.1",
+    "port": "8000",
+    "neighbours": [
+      {
+        "id": "n1",
+        "address": "10.0.0.1",
+        "port": "8000"
+      },
+      {
+        "id": "n3",
+        "address": "10.0.0.2",
+        "port": "8000"
+      }
+    ]
+  },
+  {
+    "id": "n5",
+    "address": "10.0.6.1",
+    "port": "8000",
+    "neighbours": [
+      {
+        "id": "n3",
+        "address": "10.0.0.2",
+        "port": "8000"
+      }
+    ]
+  }
+]
