@@ -342,7 +342,9 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 
 		fmt.Println("RP: Current Publisher:", currentPublisher)
 		fmt.Println("RP: Best Server:", bestServer)
-
+		if bestServer == nil || currentPublisher.Id == "" {
+			continue
+		}
 		// check if the best server is 5x better than the current publisher
 		if currentPublisher.Latency/5 >= bestServer.Latency {
 			log.Println("RP: Switching to server: " + bestServer.Id)
