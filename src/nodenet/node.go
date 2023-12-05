@@ -341,7 +341,8 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 				bestServer = server
 			}
 		}
-
+		
+		log.Println("RP: Current publisher: " + currentPublisher.Id)
 		//  check if bestServer is 500% better than the server that is currently streaming
 		if bestServer.Id != "" && currentPublisher.Id != "" && bestServer.Latency < currentPublisher.Latency/5 {
 			log.Println("RP: Switching to server: " + bestServer.Id)
