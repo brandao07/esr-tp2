@@ -321,7 +321,6 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 		for _, server := range servers {
 			if server.isPublisher {
 				currentPublisher = server
-				log.Println("RP: Current publisher: " + currentPublisher.Id)
 			}
 			sendRequest(socket, server.Address, &pac)
 			_, _ = ReadFromSocket(socket, buffer)
@@ -341,12 +340,11 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 			}
 		}
 
-		if bestServer != nil {
-			fmt.Println("RP: Best Server:", bestServer.Id)
-		}
+		fmt.Println("RP: Current Publisher:", currentPublisher)
+		fmt.Println("RP: Best Server:", bestServer)
 
-		//  check if bestServer is 500% better than the server that is currently streaming
-		if bestServer.Id != "" && currentPublisher.Id != "" && bestServer.Latency < currentPublisher.Latency/5 {
+		// check if the best server is 5x better than the current publisher
+		if currentPublisher.Latency/5 >= bestServer.Latency {
 			log.Println("RP: Switching to server: " + bestServer.Id)
 			pac := Packet{
 				Source: node.Id,
@@ -359,7 +357,7 @@ func checkServers(node *Node, wg *sync.WaitGroup, requestSocket *net.PacketConn)
 			pac.State = REQUESTING
 			pac.File = videos[0]
 			sendRequest(*requestSocket, bestServer.Address, &pac)
-		}
+		}		
 	}
 }
 
